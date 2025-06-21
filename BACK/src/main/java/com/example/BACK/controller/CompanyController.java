@@ -39,6 +39,15 @@ public class CompanyController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PostMapping("/{id}")
+    public ResponseEntity<Company> update(@PathVariable String id, @RequestBody Company c) {
+        return service.findById(id)
+                .map(existingCompany -> {
+                    existingCompany.setName(c.getName());
+                    return ResponseEntity.ok(service.save(existingCompany));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
     @DeleteMapping("/{id}")
     public void delete(@PathVariable String id) {
         service.delete(id);

@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,6 +37,18 @@ public class CustomerController {
     public ResponseEntity<Customer> get(@PathVariable String id) {
         return service.findById(id)
                 .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Customer> update(@PathVariable String id, @RequestBody Customer updatedCustomer) {
+        return service.findById(id)
+                .map(existing -> {
+                    existing.setCustomerCode(updatedCustomer.getCustomerCode());
+                    existing.setName(updatedCustomer.getName());
+                    Customer saved = service.save(existing);
+                    return ResponseEntity.ok(saved);
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 

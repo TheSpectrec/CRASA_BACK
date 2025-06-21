@@ -1,6 +1,6 @@
 package com.example.BACK.model;
 
-import java.sql.Timestamp;
+import java.math.BigDecimal;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -12,34 +12,28 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "products")
-public class Product {
+public class Product extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private String id;
+    private String code;
 
     private String description;
 
-    private boolean  price;
+    private BigDecimal price;
 
     @ManyToOne
     @JoinColumn(name = "family_id", nullable = false)
     private Family family;
 
-    @ManyToOne
-    @JoinColumn(name = "mark_id", nullable = false)
-    private Mark mark;
-
-    private Timestamp createdAt;
-
     // Getters y Setters
-    public String getId() {
-        return id;
+    public String getCode() {
+        return code;
     }
     public String getDescription() {
         return description;
     }
 
-    public boolean  getPrice() {
+    public BigDecimal getPrice() {
         return price;
     }
 
@@ -47,35 +41,19 @@ public class Product {
         return family;
     }
 
-    public Mark getMark() {
-        return mark;
-    }
-
-    public Timestamp getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setId(String id) {
-        this.id = id;
+    public void setCode(String code) {
+        this.code = code;
     }
 
     public void setDescription(String description) {
         this.description = description;
     }
 
-    public void setPrice(boolean  price) {
+    public void setPrice(BigDecimal price) {
         this.price = price;
     }
 
     public void setFamily(Family family) {
         this.family = family;
-    }
-
-    public void setMark(Mark mark) {
-        this.mark = mark;
-    }
-
-    public void setCreatedAt(Timestamp createdAt) {
-        this.createdAt = createdAt;
-    }
+    } 
 }

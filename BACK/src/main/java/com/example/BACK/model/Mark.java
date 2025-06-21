@@ -1,7 +1,5 @@
 package com.example.BACK.model;
 
-import java.sql.Timestamp;
-
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -12,7 +10,7 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "marks")
-public class Mark {
+public class Mark extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
@@ -22,8 +20,6 @@ public class Mark {
     @ManyToOne
     @JoinColumn(name = "company_id", nullable = false)
     private Company company;
-
-    private Timestamp createdAt;
 
     // Getters y Setters
     public String getId() {
@@ -38,10 +34,6 @@ public class Mark {
         return company;
     }
 
-    public Timestamp getCreatedAt() {
-        return createdAt;
-    }
-
     public void setId(String id) {
         this.id = id;
     }
@@ -52,10 +44,6 @@ public class Mark {
 
     public void setCompany(Company company) {
         this.company = company;
-    }
-
-    public void setCreatedAt(Timestamp createdAt) {
-        this.createdAt = createdAt;
     }
 }
 

@@ -1,7 +1,5 @@
 package com.example.BACK.model;
 
-import java.sql.Timestamp;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -13,7 +11,7 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "users")
-public class User {
+public class User extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
@@ -27,8 +25,6 @@ public class User {
 
     @Enumerated(EnumType.STRING)
     private Role role;
-
-    private Timestamp createdAt;
 
         // Getters y Setters
 
@@ -52,10 +48,6 @@ public class User {
         return role;
     }
 
-    public Timestamp getCreatedAt() {
-        return createdAt;
-    }
-
     public void setId(String id) {
         this.id = id;
     }
@@ -74,10 +66,6 @@ public class User {
 
     public void setRole(Role role) {
         this.role = role;
-    }
-
-    public void setCreatedAt(Timestamp createdAt) {
-        this.createdAt = createdAt;
     }
 
 }
