@@ -5,6 +5,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
@@ -19,6 +21,10 @@ public class Customer extends BaseEntity {
 
     private String name;
 
+    @ManyToOne
+    @JoinColumn(name = "vendedor_id", nullable = true) 
+    private User vendedor;
+
     // Getters y Setters
     public String getId() {
         return id;
@@ -32,6 +38,10 @@ public class Customer extends BaseEntity {
         return name;
     }
 
+    public User getVendedor() {
+        return vendedor;
+    }
+
     public void setId(String id) {
         this.id = id;
     }
@@ -43,5 +53,8 @@ public class Customer extends BaseEntity {
     public void setName(String name) {
         this.name = name;
     }
-}
 
+    public void setVendedor(User vendedor) {
+        this.vendedor = vendedor;
+    }
+}
