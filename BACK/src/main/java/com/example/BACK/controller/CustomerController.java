@@ -1,5 +1,6 @@
 package com.example.BACK.controller;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,10 +15,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.BACK.model.Customer;
+import com.example.BACK.model.Product;
 import com.example.BACK.model.Role;
 import com.example.BACK.model.User;
 import com.example.BACK.repository.UserRepository;
 import com.example.BACK.service.CustomerService;
+import com.example.BACK.service.ProductService;
 
 @RestController
 @RequestMapping("/api/customers")
@@ -29,48 +32,45 @@ public class CustomerController {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private ProductService productService;
+
     @GetMapping
     public List<Customer> all() {
         return service.findAll();
     }
 
     @PostMapping
-public ResponseEntity<Customer> create(@RequestBody Customer newCustomer) {
-    System.out.println("Recibido: " + newCustomer.getCustomerCode() + ", " + newCustomer.getName());
-    if (newCustomer.getVendedor() != null) {
-        System.out.println("Vendedor ID: " + newCustomer.getVendedor().getId());
-    }
+    public ResponseEntity<Customer> create(@RequestBody Customer newCustomer) {
+        try {
+            boolean codigoDuplicado = service.findAll().stream()
+                .anyMatch(c -> c.getCustomerCode() != null &&
+                               c.getCustomerCode().equalsIgnoreCase(newCustomer.getCustomerCode()));
+            if (codigoDuplicado) return ResponseEntity.badRequest().body(null);
 
-    try {
-        // Validación y guardado
-        List<Customer> existentes = service.findAll();
-        boolean codigoDuplicado = existentes.stream()
-    .anyMatch(c ->
-        c.getCustomerCode() != null &&
-        c.getCustomerCode().equalsIgnoreCase(newCustomer.getCustomerCode())
-    );
-
-        if (codigoDuplicado) {
-            return ResponseEntity.badRequest().body(null);
-        }
-
-        if (newCustomer.getVendedor() != null && newCustomer.getVendedor().getId() != null) {
-            var optionalVendedor = userRepository.findById(newCustomer.getVendedor().getId());
-            if (optionalVendedor.isEmpty() || optionalVendedor.get().getRole() != Role.Vendedor) {
-                return ResponseEntity.badRequest().build();
+            if (newCustomer.getVendedor() != null && newCustomer.getVendedor().getId() != null) {
+                var optionalVendedor = userRepository.findById(newCustomer.getVendedor().getId());
+                if (optionalVendedor.isEmpty() || optionalVendedor.get().getRole() != Role.Vendedor) {
+                    return ResponseEntity.badRequest().build();
+                }
+                newCustomer.setVendedor(optionalVendedor.get());
             }
-            newCustomer.setVendedor(optionalVendedor.get());
+
+            // Validar y asignar productos
+            if (newCustomer.getProductos() != null && !newCustomer.getProductos().isEmpty()) {
+                List<Product> productosValidados = new ArrayList<>();
+                for (Product p : newCustomer.getProductos()) {
+                    productService.findById(p.getCode()).ifPresent(productosValidados::add);
+                }
+                newCustomer.setProductos(productosValidados);
+            }
+
+            return ResponseEntity.ok(service.save(newCustomer));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
         }
-
-        Customer saved = service.save(newCustomer);
-        return ResponseEntity.ok(saved);
-    } catch (Exception e) {
-        e.printStackTrace(); // muestra error exacto en consola
-        return ResponseEntity.internalServerError().build(); // evita error 500 no controlado
     }
-}
-
-
 
     @GetMapping("/{id}")
     public ResponseEntity<Customer> get(@PathVariable String id) {
@@ -80,28 +80,32 @@ public ResponseEntity<Customer> create(@RequestBody Customer newCustomer) {
     }
 
     @PutMapping("/{id}")
-public ResponseEntity<Customer> update(@PathVariable String id, @RequestBody Customer updatedCustomer) {
-    var optional = service.findById(id);
-    if (optional.isEmpty()) {
-        return ResponseEntity.notFound().build();
-    }
+    public ResponseEntity<Customer> update(@PathVariable String id, @RequestBody Customer updatedCustomer) {
+        var optional = service.findById(id);
+        if (optional.isEmpty()) return ResponseEntity.notFound().build();
 
-    Customer existing = optional.get();
-    existing.setCustomerCode(updatedCustomer.getCustomerCode());
-    existing.setName(updatedCustomer.getName());
+        Customer existing = optional.get();
+        existing.setCustomerCode(updatedCustomer.getCustomerCode());
+        existing.setName(updatedCustomer.getName());
 
-    if (updatedCustomer.getVendedor() != null && updatedCustomer.getVendedor().getId() != null) {
-        var optionalVendedor = userRepository.findById(updatedCustomer.getVendedor().getId());
-        if (optionalVendedor.isEmpty() || optionalVendedor.get().getRole() != Role.Vendedor) {
-            return ResponseEntity.badRequest().build();
+        if (updatedCustomer.getVendedor() != null && updatedCustomer.getVendedor().getId() != null) {
+            var optionalVendedor = userRepository.findById(updatedCustomer.getVendedor().getId());
+            if (optionalVendedor.isEmpty() || optionalVendedor.get().getRole() != Role.Vendedor) {
+                return ResponseEntity.badRequest().build();
+            }
+            existing.setVendedor(optionalVendedor.get());
         }
-        existing.setVendedor(optionalVendedor.get());
+
+        if (updatedCustomer.getProductos() != null) {
+            List<Product> productosValidados = new ArrayList<>();
+            for (Product p : updatedCustomer.getProductos()) {
+                productService.findById(p.getCode()).ifPresent(productosValidados::add);
+            }
+            existing.setProductos(productosValidados);
+        }
+
+        return ResponseEntity.ok(service.save(existing));
     }
-
-    Customer saved = service.save(existing);
-    return ResponseEntity.ok(saved);
-}
-
 
     @DeleteMapping("/{id}")
     public void delete(@PathVariable String id) {
@@ -109,18 +113,17 @@ public ResponseEntity<Customer> update(@PathVariable String id, @RequestBody Cus
     }
 
     @PutMapping("/{id}/transferir")
-public ResponseEntity<Customer> transferirVendedor(@PathVariable String id, @RequestBody User nuevoVendedor) {
-    var optional = service.findById(id);
-    if (optional.isEmpty()) return ResponseEntity.notFound().build();
+    public ResponseEntity<Customer> transferirVendedor(@PathVariable String id, @RequestBody User nuevoVendedor) {
+        var optional = service.findById(id);
+        if (optional.isEmpty()) return ResponseEntity.notFound().build();
 
-    var c = optional.get();
-    var vendedor = userRepository.findById(nuevoVendedor.getId());
-    if (vendedor.isEmpty() || vendedor.get().getRole() != Role.Vendedor) {
-        return ResponseEntity.badRequest().build();
+        var c = optional.get();
+        var vendedor = userRepository.findById(nuevoVendedor.getId());
+        if (vendedor.isEmpty() || vendedor.get().getRole() != Role.Vendedor) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        c.setVendedor(vendedor.get());
+        return ResponseEntity.ok(service.save(c));
     }
-
-    c.setVendedor(vendedor.get());
-    return ResponseEntity.ok(service.save(c));
-}
-
 }

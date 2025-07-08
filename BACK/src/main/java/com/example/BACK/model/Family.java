@@ -1,11 +1,16 @@
 package com.example.BACK.model;
 
+import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 @Entity
@@ -21,7 +26,25 @@ public class Family extends BaseEntity {
     @JoinColumn(name = "mark_id", nullable = false)
     private Mark mark;
 
-    // Getters y Setters
+    @OneToMany(mappedBy = "family")
+@JsonIgnoreProperties("family")
+private List<Product> products;
+
+// Getters y Setters
+public List<Product> getProducts() {
+    return products;
+}
+
+public Family() {}
+
+public Family(String name) {
+    this.name = name;
+}
+
+public void setProducts(List<Product> products) {
+    this.products = products;
+}
+
     public String getId() {
         return id;
     }

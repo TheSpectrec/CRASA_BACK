@@ -1,5 +1,6 @@
 package com.example.BACK.controller;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -15,9 +16,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.BACK.model.Customer;
 import com.example.BACK.model.Role;
 import com.example.BACK.model.User;
 import com.example.BACK.repository.UserRepository;
+import com.example.BACK.service.CustomerService;
 import com.example.BACK.service.UserService;
 
 @RestController
@@ -30,16 +33,38 @@ public class UserController {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private CustomerService customerService;
 
     @GetMapping
     public List<User> all() {
         return service.findAll();
     }
 
-    @PostMapping
-    public User create(@RequestBody User u) {
-        return service.save(u);
+@PostMapping
+public ResponseEntity<User> create(@RequestBody User u) {
+    try {
+        // Guardamos el usuario (vendedor)
+        User nuevoUsuario = service.save(u);
+
+        // Si tiene clientes asignados y es vendedor, los asociamos
+        if (nuevoUsuario.getRole() == Role.Vendedor && u.getCustomers() != null) {
+            for (Customer c : u.getCustomers()) {
+                customerService.findById(c.getId()).ifPresent(cliente -> {
+                    cliente.setVendedor(nuevoUsuario);
+                    customerService.save(cliente);
+                });
+            }
+        }
+
+        return ResponseEntity.ok(nuevoUsuario);
+    } catch (Exception e) {
+        e.printStackTrace();
+        return ResponseEntity.internalServerError().build();
     }
+}
+
+
 
     @GetMapping("/{id}")
     public ResponseEntity<User> get(@PathVariable String id) {
@@ -49,19 +74,32 @@ public class UserController {
     }
 
     @GetMapping("/vendedores")
-public List<User> getVendedores() {
-    return userRepository.findByRole(Role.Vendedor);
-}
+    public List<User> getVendedores() {
+        return userRepository.findByRole(Role.Vendedor);
+    }
 
-
-    @PutMapping("/{id}")
+@PutMapping("/{id}")
 public ResponseEntity<User> update(@PathVariable String id, @RequestBody User u) {
     return service.getById(id)
             .map(existing -> {
                 existing.setName(u.getName());
                 existing.setEmail(u.getEmail());
                 existing.setRole(u.getRole());
-                // No actualizamos contraseña directamente aquí por seguridad
+
+                if (u.getCustomers() != null) {
+                    List<Customer> clientesAsignados = new ArrayList<>();
+
+                    for (Customer c : u.getCustomers()) {
+                        customerService.findById(c.getId()).ifPresent(cliente -> {
+                            cliente.setVendedor(existing);
+                            customerService.save(cliente);
+                            clientesAsignados.add(cliente);
+                        });
+                    }
+
+                    existing.setCustomers(clientesAsignados);
+                }
+
                 return ResponseEntity.ok(service.save(existing));
             })
             .orElse(ResponseEntity.notFound().build());
@@ -80,4 +118,3 @@ public ResponseEntity<User> update(@PathVariable String id, @RequestBody User u)
                 .orElse(ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
     }
 }
-
