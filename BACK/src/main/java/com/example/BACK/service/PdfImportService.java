@@ -2,28 +2,23 @@ package com.example.BACK.service;
 
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.*;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import com.example.BACK.model.Customer;
-import com.example.BACK.model.Family;
-import com.example.BACK.model.Product;
-import com.example.BACK.model.Venta;
-import com.example.BACK.repository.CustomerRepository;
-import com.example.BACK.repository.FamilyRepository;
-import com.example.BACK.repository.ProductRepository;
-import com.example.BACK.repository.VentaRepository;
+import com.example.BACK.dto.ImportResultDTO;
+import com.example.BACK.model.*;
+import com.example.BACK.repository.*;
 import com.google.api.services.drive.Drive;
-import com.google.api.services.drive.model.File;
-import com.google.api.services.drive.model.FileList;
+import com.google.api.services.drive.model.*;
 
 @Service
 public class PdfImportService {
@@ -31,173 +26,167 @@ public class PdfImportService {
     @Autowired private CustomerRepository customerRepo;
     @Autowired private ProductRepository productRepo;
     @Autowired private VentaRepository ventaRepo;
-
     @Autowired private FamilyRepository familyRepo;
+    @Autowired private ArchivoProcesadoRepository archivoRepo;
     @Autowired private Drive drive;
 
-    @Transactional
-    public void procesarFacturaPDF(InputStream inputStream) throws Exception {
-        try (PDDocument document = PDDocument.load(inputStream)) {
-            PDFTextStripper stripper = new PDFTextStripper();
-            String contenido = stripper.getText(document);
-            System.out.println("Contenido PDF:\n" + contenido);
-
-            if (contenido.contains("Cliente:") && contenido.contains("CRASA REPRESENTACIONES")) {
-                procesarFormatoCrasa(contenido);
-            } else if (contenido.contains("COMERCIALIZADORA ELORO")) {
-                procesarFormatoEloro(contenido);
-            } else if (contenido.contains("Con Alimentos S.A. de C.V.")) {
-                procesarFormatoConAlimentos(contenido);
-            } else if (contenido.contains("SERVICIO COMERCIAL GARIS")) {
-                procesarFormatoLacostena(contenido);
-            } else {
-                System.out.println("❌ Formato de PDF no reconocido.");
-            }
-        }
-    }
-
-    @Scheduled(cron = "0 */10 * * * *")
-    public void importarDesdeCarpetaCRASAVentas() throws Exception {
-        String folderName = "CRASA_VENTAS";
-        String folderId = obtenerFolderIdPorNombre(folderName);
-
-        if (folderId == null) {
-            System.out.println("Carpeta 'CRASA_VENTAS' no encontrada en Drive.");
-            return;
-        }
+    @Scheduled(cron = "0 */1 * * * *")
+    public List<ImportResultDTO> importarDesdeDriveConVentas() throws Exception {
+        List<ImportResultDTO> resultados = new ArrayList<>();
+        String folderId = obtenerFolderIdPorNombre("CRASA_VENTAS");
+        if (folderId == null) return resultados;
 
         FileList archivos = drive.files().list()
-            .setQ("'" + folderId + "' in parents")
-            .setFields("files(id, name, mimeType)")
-            .execute();
-
-        for (File archivo : archivos.getFiles()) {
-            if (archivo.getMimeType().contains("pdf")) {
-                try (InputStream inputStream = drive.files().get(archivo.getId()).executeMediaAsInputStream()) {
-                    procesarFacturaPDF(inputStream);
-                } catch (Exception e) {
-                    System.out.println("❌ Error al procesar archivo PDF: " + archivo.getName());
-                    e.printStackTrace();
-                }
-            }
-        }
-    }
-
-    private String obtenerFolderIdPorNombre(String nombreCarpeta) throws Exception {
-        FileList result = drive.files().list()
-            .setQ("mimeType = 'application/vnd.google-apps.folder' and name = '" + nombreCarpeta + "'")
+            .setQ("'" + folderId + "' in parents and mimeType contains 'pdf'")
             .setFields("files(id, name)")
             .execute();
 
-        if (result.getFiles().isEmpty()) return null;
-        return result.getFiles().get(0).getId();
-    }
+        for (File archivo : archivos.getFiles()) {
+            String nombreArchivo = archivo.getName();
+            if (archivoRepo.existsByNombre(nombreArchivo)) {
+                System.out.println("⚠️ Ya procesado: " + nombreArchivo);
+                continue;
+            }
 
-    private void guardarVentaSiNoExiste(Customer cliente, Product producto, int cantidad, BigDecimal precio, BigDecimal total, LocalDateTime fecha) {
-    LocalDateTime fechaNormalizada = fecha.toLocalDate().atStartOfDay();
-    boolean existe = ventaRepo.existsByClienteAndProductoAndFecha(cliente, producto, fechaNormalizada);
-
-    if (!existe) {
-        ventaRepo.saveAndFlush(new Venta(cliente, producto, cantidad, precio, total, fechaNormalizada));
-    } else {
-        System.out.println("⚠️ Venta duplicada detectada. No insertada: Cliente=" + cliente.getCustomerCode() + ", Producto=" + producto.getCode());
-    }
-}
-
-
-
-    private void procesarFormatoCrasa(String contenido) {
-        String customerCode = extraer(contenido, "Cliente:\\s+(\\d+)");
-        String customerName = extraer(contenido, "Cliente:\\s+\\d+\\s+([A-ZÁÉÍÓÚÑ\\s]+)");
-        if (customerCode == null || customerName == null) return;
-
-        Customer cliente = obtenerCliente(customerCode, customerName);
-
-        Pattern productoPattern = Pattern.compile(
-            "(C\\d{4,})\\s+-\\s+([A-ZÁÉÍÓÚÑ/\\s0-9]+?)\\s+0%\\s+(\\d+\\.\\d{2}).*?XBX\\d+\\s+(\\d+\\.\\d{2})",
-            Pattern.DOTALL
-        );
-        Matcher matcher = productoPattern.matcher(contenido);
-
-        while (matcher.find()) {
-            String code = matcher.group(1).replace("C", "");
-            String description = matcher.group(2).trim();
-            BigDecimal precio = new BigDecimal(matcher.group(3));
-            BigDecimal total = new BigDecimal(matcher.group(4));
-            int cantidad = total.divide(precio, 0, BigDecimal.ROUND_HALF_UP).intValue();
-
-            Product producto = obtenerProducto(code, description, precio);
-            guardarVentaSiNoExiste(cliente, producto, cantidad, precio, total, LocalDateTime.now());
+            try (InputStream inputStream = drive.files().get(archivo.getId()).executeMediaAsInputStream()) {
+                List<Venta> ventas = procesarFacturaPDF(inputStream, nombreArchivo);
+                resultados.add(new ImportResultDTO(nombreArchivo, "PDF", ventas));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
+        return resultados;
     }
 
-    private void procesarFormatoEloro(String contenido) {
-        String customerCode = extraer(contenido, "RFC:\\s*([A-Z0-9]{10,13})");
-        String customerName = extraer(contenido, "AVENDIDO A\\n+([A-ZÁÉÍÓÚÑ\\s]+)");
-        if (customerCode == null || customerName == null) return;
+    public List<Venta> procesarFacturaPDF(InputStream inputStream, String nombreArchivo) throws Exception {
+        List<Venta> ventasArchivo = new ArrayList<>();
+        try (PDDocument document = PDDocument.load(inputStream)) {
+            PDFTextStripper stripper = new PDFTextStripper();
+            String contenido = stripper.getText(document);
 
-        Customer cliente = obtenerCliente(customerCode, customerName);
+            ArchivoProcesado archivoProcesado = archivoRepo.save(
+                new ArchivoProcesado(nombreArchivo, "PDF", LocalDateTime.now())
+            );
 
-        Pattern productoPattern = Pattern.compile("(XBX\\d{12,})\\s+(\\d+\\.\\d{2})\\s+[\\dA-Z]+\\s+(\\d+\\.\\d{2})");
-        Matcher matcher = productoPattern.matcher(contenido);
+            if (contenido.contains("CRASA REPRESENTACIONES")) {
+                ventasArchivo = procesarFormatoCrasa(contenido, archivoProcesado);
+            } else if (contenido.contains("COMERCIALIZADORA ELORO")) {
+                ventasArchivo = procesarFormatoEloro(contenido, archivoProcesado);
+            } else if (contenido.contains("Con Alimentos S.A. de C.V.")) {
+                ventasArchivo = procesarFormatoConAlimentos(contenido, archivoProcesado);
+            } else if (contenido.contains("SERVICIO COMERCIAL GARIS")) {
+                ventasArchivo = procesarFormatoLacostena(contenido, archivoProcesado);
+            }
+
+            for (Venta venta : ventasArchivo) {
+                if (!ventaRepo.existsByClienteAndProductoAndFecha(venta.getCliente(), venta.getProducto(), venta.getFecha())) {
+                    ventaRepo.save(venta);
+                }
+            }
+        }
+        return ventasArchivo;
+    }
+
+    private List<Venta> procesarFormatoCrasa(String contenido, ArchivoProcesado archivo) {
+        List<Venta> ventas = new ArrayList<>();
+        Customer cliente = obtenerCliente(
+            extraer(contenido, "Cliente:\\s+(\\d+)"),
+            extraer(contenido, "Cliente:\\s+\\d+\\s+([A-ZÁÉÍÓÚÑ\\s]+)")
+        );
+        if (cliente == null) return ventas;
+
+        Matcher matcher = Pattern.compile(
+            "\\d+\\s+Caj XBX\\s+(C\\d{4,}\\s+-\\s+[A-ZÁÉÍÓÚÑ/\\s0-9]+?)\\s+\\d+\\s+\\d+\\.\\d{2}\\s+Kg\\s+\\d+%\\s+(\\d+\\.\\d{2})\\s+(\\d+\\.\\d{2})",
+            Pattern.MULTILINE
+        ).matcher(contenido);
 
         while (matcher.find()) {
-            String code = String.valueOf(System.currentTimeMillis());
-            String description = matcher.group(1);
+            String linea = matcher.group(1).trim();
+            String code = linea.split("\\s+")[0].replace("C", "");
+            String desc = linea.substring(linea.indexOf("-") + 1).trim();
+            BigDecimal precio = new BigDecimal(matcher.group(2));
+            BigDecimal total = new BigDecimal(matcher.group(3));
+            int cantidad = total.divide(precio, 2, BigDecimal.ROUND_HALF_UP).intValue();
+
+            Product producto = obtenerProducto(code, desc, precio);
+            ventas.add(new Venta(cliente, producto, cantidad, precio, total, LocalDateTime.now(), archivo));
+        }
+        return ventas;
+    }
+
+    private List<Venta> procesarFormatoEloro(String contenido, ArchivoProcesado archivo) {
+        List<Venta> ventas = new ArrayList<>();
+        Customer cliente = obtenerCliente(
+            extraer(contenido, "RFC:\\s*([A-Z0-9]{10,13})"),
+            extraer(contenido, "AVENDIDO A\\n+([A-ZÁÉÍÓÚÑ\\s]+)")
+        );
+        if (cliente == null) return ventas;
+
+        Matcher matcher = Pattern.compile(
+            "(XBX\\d{12,})\\s+(\\d+\\.\\d{2})\\s+[\\dA-Z]+\\s+(\\d+\\.\\d{2})"
+        ).matcher(contenido);
+
+        while (matcher.find()) {
+            String desc = matcher.group(1);
             int cantidad = (int) Double.parseDouble(matcher.group(2));
             BigDecimal total = new BigDecimal(matcher.group(3));
             BigDecimal precio = total.divide(new BigDecimal(cantidad), 2, BigDecimal.ROUND_HALF_UP);
-
-            Product producto = obtenerProducto(code, description, precio);
-            guardarVentaSiNoExiste(cliente, producto, cantidad, precio, total, LocalDateTime.now());
+            Product producto = obtenerProducto("AUTO-" + System.currentTimeMillis(), desc, precio);
+            ventas.add(new Venta(cliente, producto, cantidad, precio, total, LocalDateTime.now(), archivo));
         }
+        return ventas;
     }
 
-    private void procesarFormatoConAlimentos(String contenido) {
-        String customerName = extraer(contenido, "VENDIDO A\\n+([A-ZÁÉÍÓÚÑ\\s]+)");
-        String customerCode = extraer(contenido, "CLIENTE\\s+(\\d+)");
-        if (customerCode == null || customerName == null) return;
+    private List<Venta> procesarFormatoConAlimentos(String contenido, ArchivoProcesado archivo) {
+        List<Venta> ventas = new ArrayList<>();
+        Customer cliente = obtenerCliente(
+            extraer(contenido, "CLIENTE\\s+(\\d+)"),
+            extraer(contenido, "VENDIDO A\\n+([A-ZÁÉÍÓÚÑ\\s]+)")
+        );
+        if (cliente == null) return ventas;
 
-        Customer cliente = obtenerCliente(customerCode, customerName);
-
-        Pattern productoPattern = Pattern.compile("(\\d{4,})\\s+\\d{12,}\\s+\\d+\\s+([A-ZÁÉÍÓÚÑ/\\s0-9]+?)\\s+XBX\\s+(\\d+)\\s+CJ\\s+(\\d+\\.\\d{2})\\s+(\\d+\\.\\d{2})", Pattern.MULTILINE);
-        Matcher matcher = productoPattern.matcher(contenido);
+        Matcher matcher = Pattern.compile(
+            "(\\d{4,})\\s+\\d{12,}\\s+\\d+\\s+([A-ZÁÉÍÓÚÑ/\\s0-9]+?)\\s+XBX\\s+(\\d+)\\s+CJ\\s+(\\d+\\.\\d{2})\\s+(\\d+\\.\\d{2})"
+        ).matcher(contenido);
 
         while (matcher.find()) {
             String code = matcher.group(1);
-            String description = matcher.group(2).trim();
+            String desc = matcher.group(2).trim();
             int cantidad = Integer.parseInt(matcher.group(3));
             BigDecimal precio = new BigDecimal(matcher.group(4));
             BigDecimal total = new BigDecimal(matcher.group(5));
-
-            Product producto = obtenerProducto(code, description, precio);
-            guardarVentaSiNoExiste(cliente, producto, cantidad, precio, total, LocalDateTime.now());
+            Product producto = obtenerProducto(code, desc, precio);
+            ventas.add(new Venta(cliente, producto, cantidad, precio, total, LocalDateTime.now(), archivo));
         }
+        return ventas;
     }
 
-    private void procesarFormatoLacostena(String contenido) {
-        String customerName = extraer(contenido, "VENDIDO A\\n+([A-ZÁÉÍÓÚ/\\s]+)");
-        String customerCode = extraer(contenido, "CLIENTE\\s+(\\d+)");
-        if (customerCode == null || customerName == null) return;
+    private List<Venta> procesarFormatoLacostena(String contenido, ArchivoProcesado archivo) {
+        List<Venta> ventas = new ArrayList<>();
+        Customer cliente = obtenerCliente(
+            extraer(contenido, "CLIENTE\\s+(\\d+)"),
+            extraer(contenido, "VENDIDO A\\n+([A-ZÁÉÍÓÚ/\\s]+)")
+        );
+        if (cliente == null) return ventas;
 
-        Customer cliente = obtenerCliente(customerCode, customerName);
-
-        Pattern productoPattern = Pattern.compile("(\\d{3,6})\\s+\\d+\\s+\\d+\\s+([A-ZÁÉÍÓÚ/\\s0-9]+?)\\s+XBX\\s+(\\d+)\\s+CA\\s+(\\d+\\.\\d{2})\\s+(\\d+\\.\\d{2})", Pattern.MULTILINE);
-        Matcher matcher = productoPattern.matcher(contenido);
+        Matcher matcher = Pattern.compile(
+            "(\\d{3,6})\\s+\\d+\\s+\\d+\\s+([A-ZÁÉÍÓÚ/\\s0-9]+?)\\s+XBX\\s+(\\d+)\\s+CA\\s+(\\d+\\.\\d{2})\\s+(\\d+\\.\\d{2})"
+        ).matcher(contenido);
 
         while (matcher.find()) {
             String code = matcher.group(1);
-            String description = matcher.group(2).trim();
+            String desc = matcher.group(2).trim();
             int cantidad = Integer.parseInt(matcher.group(3));
             BigDecimal precio = new BigDecimal(matcher.group(4));
             BigDecimal total = new BigDecimal(matcher.group(5));
-
-            Product producto = obtenerProducto(code, description, precio);
-            guardarVentaSiNoExiste(cliente, producto, cantidad, precio, total, LocalDateTime.now());
+            Product producto = obtenerProducto(code, desc, precio);
+            ventas.add(new Venta(cliente, producto, cantidad, precio, total, LocalDateTime.now(), archivo));
         }
+        return ventas;
     }
 
     private Customer obtenerCliente(String code, String name) {
+        if (code == null || name == null) return null;
         return customerRepo.findByCustomerCode(code).orElseGet(() -> {
             Customer nuevo = new Customer();
             nuevo.setCustomerCode(code);
@@ -207,26 +196,29 @@ public class PdfImportService {
     }
 
     private Product obtenerProducto(String code, String desc, BigDecimal precio) {
-    return productRepo.findById(code).orElseGet(() -> {
-        Product nuevo = new Product();
-        nuevo.setCode(code);
-        nuevo.setDescription(desc);
-        nuevo.setPrice(precio);
-        nuevo.setCreatedAt(java.sql.Timestamp.valueOf(LocalDateTime.now())); // conversión segura
-
-
-        // Asignar familia por defecto
-        Family familiaDefault = familyRepo.findByName("General")
-            .orElseGet(() -> familyRepo.save(new Family("General")));
-
-        nuevo.setFamily(familiaDefault);
-
-        return productRepo.save(nuevo);
-    });
-}
+        return productRepo.findById(code).orElseGet(() -> {
+            Product nuevo = new Product();
+            nuevo.setCode(code);
+            nuevo.setDescription(desc);
+            nuevo.setPrice(precio);
+            nuevo.setCreatedAt(Timestamp.valueOf(LocalDateTime.now()));
+            Family familia = familyRepo.findByName("General").orElseGet(() -> familyRepo.save(new Family("General")));
+            nuevo.setFamily(familia);
+            return productRepo.save(nuevo);
+        });
+    }
 
     private String extraer(String texto, String regex) {
         Matcher matcher = Pattern.compile(regex, Pattern.DOTALL).matcher(texto);
         return matcher.find() ? matcher.group(1).trim() : null;
+    }
+
+    private String obtenerFolderIdPorNombre(String nombreCarpeta) throws Exception {
+        FileList result = drive.files().list()
+            .setQ("mimeType = 'application/vnd.google-apps.folder' and name = '" + nombreCarpeta + "'")
+            .setFields("files(id, name)")
+            .execute();
+        if (result.getFiles().isEmpty()) return null;
+        return result.getFiles().get(0).getId();
     }
 }

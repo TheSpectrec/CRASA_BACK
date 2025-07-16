@@ -2,28 +2,20 @@ package com.example.BACK.service;
 
 import java.io.InputStream;
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
+import java.time.LocalDateTime;
+import java.util.*;
 
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import com.example.BACK.model.Customer;
-import com.example.BACK.model.Product;
-import com.example.BACK.model.Venta;
-import com.example.BACK.repository.CustomerRepository;
-import com.example.BACK.repository.ProductRepository;
-import com.example.BACK.repository.VentaRepository;
+import com.example.BACK.dto.ImportResultDTO;
+import com.example.BACK.model.*;
+import com.example.BACK.repository.*;
 import com.google.api.services.drive.Drive;
-import com.google.api.services.drive.model.File;
-import com.google.api.services.drive.model.FileList;
+import com.google.api.services.drive.model.*;
 
 @Service
 public class ExcelImportService {
@@ -31,12 +23,46 @@ public class ExcelImportService {
     @Autowired private CustomerRepository customerRepo;
     @Autowired private ProductRepository productRepo;
     @Autowired private VentaRepository ventaRepo;
+    @Autowired private ArchivoProcesadoRepository archivoRepo;
     @Autowired private Drive drive;
 
-    public void procesarReporteVentas(InputStream inputStream) throws Exception {
+    @Scheduled(cron = "0 */1 * * * *")
+    public List<ImportResultDTO> importarDesdeDriveConVentas() throws Exception {
+        List<ImportResultDTO> resultados = new ArrayList<>();
+        String folderId = obtenerFolderIdPorNombre("CRASA_VENTAS");
+        if (folderId == null) return resultados;
+
+        FileList archivos = drive.files().list()
+            .setQ("'" + folderId + "' in parents and mimeType contains 'spreadsheet'")
+            .setFields("files(id, name)")
+            .execute();
+
+        for (File archivo : archivos.getFiles()) {
+            String nombreArchivo = archivo.getName();
+            if (archivoRepo.existsByNombre(nombreArchivo)) {
+                System.out.println("⚠️ Ya procesado: " + nombreArchivo);
+                continue;
+            }
+
+            try (InputStream inputStream = drive.files().get(archivo.getId()).executeMediaAsInputStream()) {
+                List<Venta> ventas = procesarReporteVentas(inputStream, nombreArchivo);
+                resultados.add(new ImportResultDTO(nombreArchivo, "Excel", ventas));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        return resultados;
+    }
+
+    public List<Venta> procesarReporteVentas(InputStream inputStream, String nombreArchivo) throws Exception {
+        List<Venta> ventas = new ArrayList<>();
         Workbook workbook = new XSSFWorkbook(inputStream);
         Sheet sheet = workbook.getSheetAt(0);
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+        ArchivoProcesado archivo = archivoRepo.save(
+            new ArchivoProcesado(nombreArchivo, "Excel", LocalDateTime.now())
+        );
 
         for (Row row : sheet) {
             if (row.getRowNum() == 0) continue;
@@ -45,66 +71,68 @@ public class ExcelImportService {
             String customerName = getCellString(row.getCell(1));
             String productDescription = getCellString(row.getCell(3));
             int cantidad = (int) row.getCell(4).getNumericCellValue();
-            BigDecimal precioUnitario = new BigDecimal(row.getCell(5).getNumericCellValue());
+            BigDecimal precio = new BigDecimal(row.getCell(5).getNumericCellValue());
             BigDecimal total = new BigDecimal(row.getCell(6).getNumericCellValue());
-            LocalDate fecha = row.getCell(7).getLocalDateTimeCellValue().toLocalDate();
+            LocalDateTime fechaHora = row.getCell(7).getLocalDateTimeCellValue().toLocalDate().atStartOfDay();
 
             Customer cliente = customerRepo.findByCustomerCode(customerCode).orElseGet(() -> {
                 Customer nuevo = new Customer();
                 nuevo.setCustomerCode(customerCode);
-                return nuevo;
+                nuevo.setName(customerName);
+                return customerRepo.save(nuevo);
             });
-            cliente.setName(customerName);
-            customerRepo.save(cliente);
 
             Product producto = productRepo.findByDescription(productDescription).orElseGet(() -> {
                 Product nuevo = new Product();
-                nuevo.setCode("SIN-CODIGO-" + System.currentTimeMillis());
+                nuevo.setCode("AUTO-" + System.currentTimeMillis());
                 nuevo.setDescription(productDescription);
-                nuevo.setPrice(precioUnitario);
+                nuevo.setPrice(precio);
                 return productRepo.save(nuevo);
             });
 
-            if (producto.getPrice().compareTo(precioUnitario) != 0) {
-                producto.setPrice(precioUnitario);
-                productRepo.save(producto);
+            if (!ventaRepo.existsByClienteAndProductoAndFecha(cliente, producto, fechaHora)) {
+                Venta venta = new Venta(cliente, producto, cantidad, precio, total, fechaHora, archivo);
+                ventaRepo.save(venta);
+                ventas.add(venta);
             }
-
-            Venta venta = new Venta(cliente, producto, cantidad, precioUnitario, total, fecha.atStartOfDay());
-            ventaRepo.saveAndFlush(venta);
         }
 
         workbook.close();
+        return ventas;
     }
 
-    @Scheduled(cron = "0 */10 * * * *")
-    public void importarDesdeCarpetaCRASAVentas() throws Exception {
-        String folderName = "CRASA_VENTAS";
-        String folderId = obtenerFolderIdPorNombre(folderName);
+    public String importarDesdeCarpetaCRASAVentasConResumen() throws Exception {
+        StringBuilder resumen = new StringBuilder();
+        int excelProcesados = 0;
+        int errores = 0;
 
-        if (folderId == null) {
-            System.out.println("Carpeta 'CRASA_VENTAS' no encontrada en Drive.");
-            return;
-        }
+        String folderId = obtenerFolderIdPorNombre("CRASA_VENTAS");
+        if (folderId == null) return "❌ Carpeta no encontrada.";
 
         FileList archivos = drive.files().list()
-            .setQ("'" + folderId + "' in parents")
-            .setFields("files(id, name, mimeType)")
+            .setQ("'" + folderId + "' in parents and mimeType contains 'spreadsheet'")
+            .setFields("files(id, name)")
             .execute();
 
-        List<File> files = archivos.getFiles();
-        System.out.println("Archivos encontrados en carpeta CRASA_VENTAS: " + files.size());
+        for (File archivo : archivos.getFiles()) {
+            String nombreArchivo = archivo.getName();
+            if (archivoRepo.existsByNombre(nombreArchivo)) {
+                System.out.println("⚠️ Ya procesado (resumen): " + nombreArchivo);
+                continue;
+            }
 
-        for (File archivo : files) {
             try (InputStream inputStream = drive.files().get(archivo.getId()).executeMediaAsInputStream()) {
-                if (archivo.getMimeType().contains("spreadsheet") || archivo.getName().endsWith(".xlsx")) {
-                    procesarReporteVentas(inputStream);
-                }
+                procesarReporteVentas(inputStream, nombreArchivo);
+                excelProcesados++;
             } catch (Exception e) {
-                System.out.println("❌ Error al procesar archivo Excel: " + archivo.getName());
-                e.printStackTrace();
+                resumen.append("❌ Error al procesar: ").append(nombreArchivo).append("\n");
+                errores++;
             }
         }
+
+        resumen.append("✅ Excel procesados: ").append(excelProcesados).append("\n");
+        resumen.append("❌ Con errores: ").append(errores).append("\n");
+        return resumen.toString();
     }
 
     private String obtenerFolderIdPorNombre(String nombreCarpeta) throws Exception {

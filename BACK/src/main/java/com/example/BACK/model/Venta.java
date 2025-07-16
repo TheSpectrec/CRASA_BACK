@@ -34,14 +34,21 @@ private Product producto;
 
     public Venta() {}
 
-    public Venta(Customer cliente, Product producto, int cantidad, BigDecimal precioUnitario, BigDecimal total, LocalDateTime fecha) {
-        this.cliente = cliente;
-        this.producto = producto;
-        this.cantidad = cantidad;
-        this.precioUnitario = precioUnitario;
-        this.total = total;
-        this.fecha = fecha;
-    }
+    @ManyToOne
+@JoinColumn(name = "archivo_id")
+private ArchivoProcesado archivo; // nuevo campo
+
+// En constructor de Venta
+public Venta(Customer cliente, Product producto, int cantidad, BigDecimal precioUnitario, BigDecimal total, LocalDateTime fecha, ArchivoProcesado archivo) {
+    this.cliente = cliente;
+    this.producto = producto;
+    this.cantidad = cantidad;
+    this.precioUnitario = precioUnitario;
+    this.total = total;
+    this.fecha = fecha;
+    this.archivo = archivo;
+}
+
 
     public String getId() { return id; }
     public Customer getCliente() { return cliente; }
@@ -56,4 +63,6 @@ private Product producto;
     public void setTotal(BigDecimal total) { this.total = total; }
     public LocalDateTime getFecha() { return fecha; }
     public void setFecha(LocalDateTime fecha) { this.fecha = fecha; }
+    public ArchivoProcesado getArchivo() { return archivo; }
+    public void setArchivo(ArchivoProcesado archivo) { this.archivo = archivo; }
 }
