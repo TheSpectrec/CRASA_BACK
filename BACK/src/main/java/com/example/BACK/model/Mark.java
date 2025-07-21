@@ -30,6 +30,12 @@ public class Mark extends BaseEntity {
 @JsonIgnoreProperties("mark")
 private List<Family> families;
 
+public Mark() {}
+
+public Mark(String name) {
+    this.name = name;
+}
+
 // Getters y Setters
 
 public List<Family> getFamilies() {

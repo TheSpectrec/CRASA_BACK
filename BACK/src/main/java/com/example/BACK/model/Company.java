@@ -24,6 +24,11 @@ public class Company extends BaseEntity {
 @JsonIgnoreProperties("company")
 private List<Mark> marks;
 
+public Company() {}
+
+public Company(String name) {
+    this.name = name;
+}
 
     // Getters y Setters
 

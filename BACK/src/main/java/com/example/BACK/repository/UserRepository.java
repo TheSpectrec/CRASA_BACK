@@ -11,5 +11,6 @@ import com.example.BACK.model.User;
 public interface UserRepository extends JpaRepository<User, String> {
     Optional<User> findByEmail(String email);
     List<User> findByRole(Role role);
+    Optional<User> findByNameIgnoreCase(String name);
 
 }

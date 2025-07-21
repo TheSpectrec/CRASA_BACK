@@ -2,9 +2,12 @@ package com.example.BACK.service;
 
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,7 +18,8 @@ import com.example.BACK.dto.ImportResultDTO;
 import com.example.BACK.model.*;
 import com.example.BACK.repository.*;
 import com.google.api.services.drive.Drive;
-import com.google.api.services.drive.model.*;
+import com.google.api.services.drive.model.File;
+import com.google.api.services.drive.model.FileList;
 
 @Service
 public class ExcelImportService {
@@ -24,6 +28,10 @@ public class ExcelImportService {
     @Autowired private ProductRepository productRepo;
     @Autowired private VentaRepository ventaRepo;
     @Autowired private ArchivoProcesadoRepository archivoRepo;
+    @Autowired private FamilyRepository familyRepo;
+    @Autowired private MarkRepository markRepo;
+    @Autowired private CompanyRepository companyRepo;
+    @Autowired private UserRepository userRepo;
     @Autowired private Drive drive;
 
     @Scheduled(cron = "0 */1 * * * *")
@@ -33,7 +41,7 @@ public class ExcelImportService {
         if (folderId == null) return resultados;
 
         FileList archivos = drive.files().list()
-            .setQ("'" + folderId + "' in parents and mimeType contains 'spreadsheet'")
+            .setQ("'" + folderId + "' in parents and (mimeType contains 'spreadsheet' or name contains '.xls')")
             .setFields("files(id, name)")
             .execute();
 
@@ -57,8 +65,12 @@ public class ExcelImportService {
 
     public List<Venta> procesarReporteVentas(InputStream inputStream, String nombreArchivo) throws Exception {
         List<Venta> ventas = new ArrayList<>();
-        Workbook workbook = new XSSFWorkbook(inputStream);
-        Sheet sheet = workbook.getSheetAt(0);
+        Workbook workbook = nombreArchivo.toLowerCase().endsWith(".xls")
+            ? new HSSFWorkbook(inputStream)
+            : new XSSFWorkbook(inputStream);
+
+        Sheet sheet = workbook.getSheet("FINAL");
+        if (sheet == null) return ventas;
 
         ArchivoProcesado archivo = archivoRepo.save(
             new ArchivoProcesado(nombreArchivo, "Excel", LocalDateTime.now())
@@ -68,30 +80,58 @@ public class ExcelImportService {
             if (row.getRowNum() == 0) continue;
 
             String customerCode = getCellString(row.getCell(0));
-            String customerName = getCellString(row.getCell(1));
-            String productDescription = getCellString(row.getCell(3));
-            int cantidad = (int) row.getCell(4).getNumericCellValue();
-            BigDecimal precio = new BigDecimal(row.getCell(5).getNumericCellValue());
-            BigDecimal total = new BigDecimal(row.getCell(6).getNumericCellValue());
-            LocalDateTime fechaHora = row.getCell(7).getLocalDateTimeCellValue().toLocalDate().atStartOfDay();
+            String productCode = getCellString(row.getCell(1));
+            String description = getCellString(row.getCell(2));
+            int cantidad = extractInt(row.getCell(3));
+            BigDecimal precioUnitario = extractDecimal(row.getCell(4));
+            BigDecimal precioTotal = extractDecimal(row.getCell(6));
+            String customerName = getCellString(row.getCell(9));
+            String vendedorName = getCellString(row.getCell(10));
+            int year = extractInt(row.getCell(11));
+            String month = getCellString(row.getCell(12));
+            String markName = getCellString(row.getCell(13));
+            String companyName = getCellString(row.getCell(14));
+            String familyName = getCellString(row.getCell(15));
+
+            if (customerCode == null || productCode == null) continue;
+
+            User vendedor = userRepo.findByNameIgnoreCase(vendedorName).orElse(null);
+            if (vendedor == null) continue;
 
             Customer cliente = customerRepo.findByCustomerCode(customerCode).orElseGet(() -> {
                 Customer nuevo = new Customer();
                 nuevo.setCustomerCode(customerCode);
                 nuevo.setName(customerName);
+                nuevo.setVendedor(vendedor);
                 return customerRepo.save(nuevo);
             });
 
-            Product producto = productRepo.findByDescription(productDescription).orElseGet(() -> {
+            Mark marca = markRepo.findById(markName).orElseGet(() -> markRepo.save(new Mark(markName)));
+            Company company = companyRepo.findById(companyName).orElseGet(() -> companyRepo.save(new Company(companyName)));
+
+            Family familia = familyRepo.findByName(familyName).orElseGet(() -> {
+                Family nueva = new Family();
+                nueva.setName(familyName);
+                nueva.setMark(marca);
+                return familyRepo.save(nueva);
+            });
+
+            Product producto = productRepo.findById(productCode).orElseGet(() -> {
                 Product nuevo = new Product();
-                nuevo.setCode("AUTO-" + System.currentTimeMillis());
-                nuevo.setDescription(productDescription);
-                nuevo.setPrice(precio);
+                nuevo.setCode(productCode);
+                nuevo.setDescription(description);
+                nuevo.setPrice(precioUnitario);
+                nuevo.setCreatedAt(Timestamp.valueOf(LocalDateTime.now()));
+                nuevo.setFamily(familia);
+                nuevo.setMark(marca);
+                nuevo.setCompany(company);
                 return productRepo.save(nuevo);
             });
 
-            if (!ventaRepo.existsByClienteAndProductoAndFecha(cliente, producto, fechaHora)) {
-                Venta venta = new Venta(cliente, producto, cantidad, precio, total, fechaHora, archivo);
+            LocalDateTime fecha = LocalDateTime.of(year, convertirMes(month), 1, 0, 0);
+
+            if (!ventaRepo.existsByClienteAndProductoAndFecha(cliente, producto, fecha)) {
+                Venta venta = new Venta(cliente, producto, cantidad, precioUnitario, precioTotal, fecha, archivo);
                 ventaRepo.save(venta);
                 ventas.add(venta);
             }
@@ -101,38 +141,34 @@ public class ExcelImportService {
         return ventas;
     }
 
-    public String importarDesdeCarpetaCRASAVentasConResumen() throws Exception {
-        StringBuilder resumen = new StringBuilder();
-        int excelProcesados = 0;
-        int errores = 0;
+    private int convertirMes(String nombreMes) {
+        return switch (nombreMes.toLowerCase()) {
+            case "enero" -> 1; case "febrero" -> 2; case "marzo" -> 3; case "abril" -> 4;
+            case "mayo" -> 5; case "junio" -> 6; case "julio" -> 7; case "agosto" -> 8;
+            case "septiembre" -> 9; case "octubre" -> 10; case "noviembre" -> 11; case "diciembre" -> 12;
+            default -> 1;
+        };
+    }
 
-        String folderId = obtenerFolderIdPorNombre("CRASA_VENTAS");
-        if (folderId == null) return "❌ Carpeta no encontrada.";
+    private String getCellString(Cell cell) {
+        if (cell == null) return null;
+        return switch (cell.getCellType()) {
+            case STRING -> cell.getStringCellValue().trim();
+            case NUMERIC -> String.valueOf((long) cell.getNumericCellValue());
+            default -> null;
+        };
+    }
 
-        FileList archivos = drive.files().list()
-            .setQ("'" + folderId + "' in parents and mimeType contains 'spreadsheet'")
-            .setFields("files(id, name)")
-            .execute();
+    private BigDecimal extractDecimal(Cell cell) {
+        return (cell != null && cell.getCellType() == CellType.NUMERIC)
+            ? BigDecimal.valueOf(cell.getNumericCellValue())
+            : BigDecimal.ZERO;
+    }
 
-        for (File archivo : archivos.getFiles()) {
-            String nombreArchivo = archivo.getName();
-            if (archivoRepo.existsByNombre(nombreArchivo)) {
-                System.out.println("⚠️ Ya procesado (resumen): " + nombreArchivo);
-                continue;
-            }
-
-            try (InputStream inputStream = drive.files().get(archivo.getId()).executeMediaAsInputStream()) {
-                procesarReporteVentas(inputStream, nombreArchivo);
-                excelProcesados++;
-            } catch (Exception e) {
-                resumen.append("❌ Error al procesar: ").append(nombreArchivo).append("\n");
-                errores++;
-            }
-        }
-
-        resumen.append("✅ Excel procesados: ").append(excelProcesados).append("\n");
-        resumen.append("❌ Con errores: ").append(errores).append("\n");
-        return resumen.toString();
+    private int extractInt(Cell cell) {
+        return (cell != null && cell.getCellType() == CellType.NUMERIC)
+            ? (int) cell.getNumericCellValue()
+            : 0;
     }
 
     private String obtenerFolderIdPorNombre(String nombreCarpeta) throws Exception {
@@ -143,14 +179,5 @@ public class ExcelImportService {
 
         if (result.getFiles().isEmpty()) return null;
         return result.getFiles().get(0).getId();
-    }
-
-    private String getCellString(Cell cell) {
-        if (cell == null) return null;
-        return switch (cell.getCellType()) {
-            case STRING -> cell.getStringCellValue();
-            case NUMERIC -> String.valueOf((long) cell.getNumericCellValue());
-            default -> null;
-        };
     }
 }

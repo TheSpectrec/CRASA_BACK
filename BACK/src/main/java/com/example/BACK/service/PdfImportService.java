@@ -6,21 +6,33 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.example.BACK.dto.ImportResultDTO;
-import com.example.BACK.model.*;
-import com.example.BACK.repository.*;
+import com.example.BACK.model.ArchivoProcesado;
+import com.example.BACK.model.Customer;
+import com.example.BACK.model.Family;
+import com.example.BACK.model.Product;
+import com.example.BACK.model.Venta;
+import com.example.BACK.repository.ArchivoProcesadoRepository;
+import com.example.BACK.repository.CustomerRepository;
+import com.example.BACK.repository.FamilyRepository;
+import com.example.BACK.repository.ProductRepository;
+import com.example.BACK.repository.VentaRepository;
 import com.google.api.services.drive.Drive;
-import com.google.api.services.drive.model.*;
+import com.google.api.services.drive.model.File;
+import com.google.api.services.drive.model.FileList;
 
 @Service
+@Transactional
 public class PdfImportService {
 
     @Autowired private CustomerRepository customerRepo;
@@ -43,10 +55,7 @@ public class PdfImportService {
 
         for (File archivo : archivos.getFiles()) {
             String nombreArchivo = archivo.getName();
-            if (archivoRepo.existsByNombre(nombreArchivo)) {
-                System.out.println("⚠️ Ya procesado: " + nombreArchivo);
-                continue;
-            }
+            if (archivoRepo.existsByNombre(nombreArchivo)) continue;
 
             try (InputStream inputStream = drive.files().get(archivo.getId()).executeMediaAsInputStream()) {
                 List<Venta> ventas = procesarFacturaPDF(inputStream, nombreArchivo);
@@ -76,6 +85,8 @@ public class PdfImportService {
                 ventasArchivo = procesarFormatoConAlimentos(contenido, archivoProcesado);
             } else if (contenido.contains("SERVICIO COMERCIAL GARIS")) {
                 ventasArchivo = procesarFormatoLacostena(contenido, archivoProcesado);
+            } else {
+                ventasArchivo = procesarFormatoGenerico(contenido, archivoProcesado);
             }
 
             for (Venta venta : ventasArchivo) {
@@ -86,6 +97,28 @@ public class PdfImportService {
         }
         return ventasArchivo;
     }
+
+    private List<Venta> procesarFormatoGenerico(String contenido, ArchivoProcesado archivo) {
+        List<Venta> ventas = new ArrayList<>();
+        Customer cliente = obtenerCliente("GEN001", "Cliente Genérico");
+
+        Matcher matcher = Pattern.compile(
+            "(\\w{3,})\\s+-\\s+([A-ZÁÉÍÓÚÑ/\\s0-9]+?)\\s+(\\d+)\\s+(\\d+\\.\\d{2})\\s+(\\d+\\.\\d{2})"
+        ).matcher(contenido);
+
+        while (matcher.find()) {
+            String code = matcher.group(1);
+            String desc = matcher.group(2);
+            int cantidad = Integer.parseInt(matcher.group(3));
+            BigDecimal precio = new BigDecimal(matcher.group(4));
+            BigDecimal total = new BigDecimal(matcher.group(5));
+            Product producto = obtenerProducto(code, desc, precio);
+            ventas.add(new Venta(cliente, producto, cantidad, precio, total, LocalDateTime.now(), archivo));
+        }
+        return ventas;
+    }
+
+    // Los métodos procesarFormatoCrasa, Eloro, ConAlimentos, Lacostena permanecen como ya los tienes
 
     private List<Venta> procesarFormatoCrasa(String contenido, ArchivoProcesado archivo) {
         List<Venta> ventas = new ArrayList<>();
@@ -102,8 +135,8 @@ public class PdfImportService {
 
         while (matcher.find()) {
             String linea = matcher.group(1).trim();
-            String code = linea.split("\\s+")[0].replace("C", "");
-            String desc = linea.substring(linea.indexOf("-") + 1).trim();
+            String code = safeSplit(linea, "\\s+", 0).replace("C", "");
+            String desc = linea.contains("-") ? linea.substring(linea.indexOf("-") + 1).trim() : linea;
             BigDecimal precio = new BigDecimal(matcher.group(2));
             BigDecimal total = new BigDecimal(matcher.group(3));
             int cantidad = total.divide(precio, 2, BigDecimal.ROUND_HALF_UP).intValue();
@@ -185,6 +218,7 @@ public class PdfImportService {
         return ventas;
     }
 
+    
     private Customer obtenerCliente(String code, String name) {
         if (code == null || name == null) return null;
         return customerRepo.findByCustomerCode(code).orElseGet(() -> {
@@ -220,5 +254,15 @@ public class PdfImportService {
             .execute();
         if (result.getFiles().isEmpty()) return null;
         return result.getFiles().get(0).getId();
+    }
+
+    private String safeSplit(String line, String delimiter, int index) {
+        if (line != null && line.matches(".*" + delimiter + ".*")) {
+            String[] parts = line.split(delimiter);
+            if (parts.length > index) {
+                return parts[index].trim();
+            }
+        }
+        return "";
     }
 }
