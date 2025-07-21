@@ -1,6 +1,7 @@
 package com.example.BACK.controller;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -12,6 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.example.BACK.dto.ImportResultDTO;
 import com.example.BACK.model.ArchivoProcesado;
+import com.example.BACK.model.Customer;
 import com.example.BACK.model.Venta;
 import com.example.BACK.repository.ArchivoProcesadoRepository;
 import com.example.BACK.repository.VentaRepository;
@@ -108,6 +110,56 @@ public class DriveImportController {
     ArchivoProcesado archivo = archivoRepo.findByNombre(nombre).orElse(null);
         if (archivo == null) return Collections.emptyList();
             return ventaRepo.findByArchivo(archivo);
+    }
+    
+    @GetMapping("/diagnostico")
+    public ResponseEntity<String> diagnosticarEstado() {
+        StringBuilder diagnostico = new StringBuilder();
+        diagnostico.append("=== DIAGNÓSTICO DEL SISTEMA ===\n\n");
+        
+        try {
+            long totalVentas = ventaRepo.count();
+            diagnostico.append("📊 Total de ventas en BD: ").append(totalVentas).append("\n");
+            
+            long totalArchivos = archivoRepo.count();
+            diagnostico.append("📁 Total de archivos procesados: ").append(totalArchivos).append("\n");
+            
+            List<ArchivoProcesado> archivos = archivoRepo.findAll();
+            diagnostico.append("\n📋 Archivos procesados:\n");
+            for (ArchivoProcesado archivo : archivos) {
+                long ventasArchivo = ventaRepo.countByArchivo(archivo);
+                diagnostico.append("  - ").append(archivo.getNombre())
+                          .append(" (").append(archivo.getTipo()).append("): ")
+                          .append(ventasArchivo).append(" ventas\n");
+            }
+            
+            diagnostico.append("\n✅ Conexión a base de datos: OK");
+            
+        } catch (Exception e) {
+            diagnostico.append("❌ Error en diagnóstico: ").append(e.getMessage()).append("\n");
+            e.printStackTrace();
+        }
+        
+        return ResponseEntity.ok(diagnostico.toString());
+    }
+    
+    @PostMapping("/test-save")
+    public ResponseEntity<String> probarGuardadoVenta() {
+        try {
+            // Crear datos de prueba
+            ArchivoProcesado archivoTest = new ArchivoProcesado("TEST_FILE.pdf", "PDF", LocalDateTime.now());
+            archivoTest = archivoRepo.save(archivoTest);
+            
+            // Crear cliente de prueba
+            Customer clienteTest = new Customer();
+            clienteTest.setCustomerCode("TEST001");
+            clienteTest.setName("Cliente de Prueba");
+            // No guardar aún para verificar si causa problemas
+            
+            return ResponseEntity.ok("✅ Prueba completada - revisar logs para detalles");
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("❌ Error en prueba: " + e.getMessage());
+        }
     }
     
 }

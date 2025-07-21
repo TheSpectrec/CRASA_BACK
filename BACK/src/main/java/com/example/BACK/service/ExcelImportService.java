@@ -93,18 +93,36 @@ public class ExcelImportService {
             String companyName = getCellString(row.getCell(14));
             String familyName = getCellString(row.getCell(15));
 
-            if (customerCode == null || productCode == null) continue;
+            if (customerCode == null || productCode == null) {
+                System.out.println("⚠️ Fila omitida - CustomerCode o ProductCode es null: Fila " + row.getRowNum());
+                continue;
+            }
 
             User vendedor = userRepo.findByNameIgnoreCase(vendedorName).orElse(null);
-            if (vendedor == null) continue;
+            if (vendedor == null) {
+                System.out.println("⚠️ Vendedor no encontrado: " + vendedorName + " - Fila " + row.getRowNum());
+                continue;
+            }
 
             Customer cliente = customerRepo.findByCustomerCode(customerCode).orElseGet(() -> {
-                Customer nuevo = new Customer();
-                nuevo.setCustomerCode(customerCode);
-                nuevo.setName(customerName);
-                nuevo.setVendedor(vendedor);
-                return customerRepo.save(nuevo);
+                try {
+                    Customer nuevo = new Customer();
+                    nuevo.setCustomerCode(customerCode);
+                    nuevo.setName(customerName);
+                    nuevo.setVendedor(vendedor);
+                    Customer clienteGuardado = customerRepo.save(nuevo);
+                    System.out.println("✅ Cliente creado: " + clienteGuardado.getCustomerCode());
+                    return clienteGuardado;
+                } catch (Exception e) {
+                    System.err.println("❌ Error al crear cliente: " + customerCode + " - " + e.getMessage());
+                    return null;
+                }
             });
+
+            if (cliente == null) {
+                System.out.println("⚠️ No se pudo crear/obtener cliente: " + customerCode);
+                continue;
+            }
 
             Mark marca = markRepo.findById(markName).orElseGet(() -> markRepo.save(new Mark(markName)));
             Company company = companyRepo.findById(companyName).orElseGet(() -> companyRepo.save(new Company(companyName)));
@@ -117,23 +135,43 @@ public class ExcelImportService {
             });
 
             Product producto = productRepo.findById(productCode).orElseGet(() -> {
-                Product nuevo = new Product();
-                nuevo.setCode(productCode);
-                nuevo.setDescription(description);
-                nuevo.setPrice(precioUnitario);
-                nuevo.setCreatedAt(Timestamp.valueOf(LocalDateTime.now()));
-                nuevo.setFamily(familia);
-                nuevo.setMark(marca);
-                nuevo.setCompany(company);
-                return productRepo.save(nuevo);
+                try {
+                    Product nuevo = new Product();
+                    nuevo.setCode(productCode);
+                    nuevo.setDescription(description);
+                    nuevo.setPrice(precioUnitario);
+                    nuevo.setCreatedAt(Timestamp.valueOf(LocalDateTime.now()));
+                    nuevo.setFamily(familia);
+                    nuevo.setMark(marca);
+                    nuevo.setCompany(company);
+                    Product productoGuardado = productRepo.save(nuevo);
+                    System.out.println("✅ Producto creado: " + productoGuardado.getCode());
+                    return productoGuardado;
+                } catch (Exception e) {
+                    System.err.println("❌ Error al crear producto: " + productCode + " - " + e.getMessage());
+                    return null;
+                }
             });
+
+            if (producto == null) {
+                System.out.println("⚠️ No se pudo crear/obtener producto: " + productCode);
+                continue;
+            }
 
             LocalDateTime fecha = LocalDateTime.of(year, convertirMes(month), 1, 0, 0);
 
-            if (!ventaRepo.existsByClienteAndProductoAndFecha(cliente, producto, fecha)) {
-                Venta venta = new Venta(cliente, producto, cantidad, precioUnitario, precioTotal, fecha, archivo);
-                ventaRepo.save(venta);
-                ventas.add(venta);
+            try {
+                if (!ventaRepo.existsByClienteAndProductoAndFecha(cliente, producto, fecha)) {
+                    Venta venta = new Venta(cliente, producto, cantidad, precioUnitario, precioTotal, fecha, archivo);
+                    Venta ventaGuardada = ventaRepo.save(venta);
+                    ventas.add(ventaGuardada);
+                    System.out.println("✅ Venta guardada: " + ventaGuardada.getId());
+                } else {
+                    System.out.println("⚠️ Venta duplicada, no se guardó: " + customerCode + " - " + productCode);
+                }
+            } catch (Exception e) {
+                System.err.println("❌ Error al guardar venta: " + e.getMessage());
+                e.printStackTrace();
             }
         }
 
