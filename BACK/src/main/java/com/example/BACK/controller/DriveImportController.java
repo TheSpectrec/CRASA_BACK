@@ -125,15 +125,34 @@ public class DriveImportController {
             diagnostico.append("📁 Total de archivos procesados: ").append(totalArchivos).append("\n");
             
             List<ArchivoProcesado> archivos = archivoRepo.findAll();
-            diagnostico.append("\n📋 Archivos procesados:\n");
+            List<ArchivoProcesado> archivosConError = archivos.stream()
+                .filter(a -> a.getTipo().contains("Error"))
+                .toList();
+            
+            diagnostico.append("\n📋 Archivos procesados exitosamente: ").append(archivos.size() - archivosConError.size()).append("\n");
+            diagnostico.append("⚠️ Archivos con errores: ").append(archivosConError.size()).append("\n");
+            
+            if (!archivosConError.isEmpty()) {
+                diagnostico.append("\n🚨 ARCHIVOS CON ERRORES:\n");
+                for (ArchivoProcesado archivo : archivosConError) {
+                    diagnostico.append("  - ").append(archivo.getNombre())
+                        .append(" (").append(archivo.getTipo()).append(") - ")
+                        .append(archivo.getFecha()).append("\n");
+                }
+            }
+            
+            diagnostico.append("\n📈 ARCHIVOS PROCESADOS EXITOSAMENTE:\n");
             for (ArchivoProcesado archivo : archivos) {
-                long ventasArchivo = ventaRepo.countByArchivo(archivo);
-                diagnostico.append("  - ").append(archivo.getNombre())
-                          .append(" (").append(archivo.getTipo()).append("): ")
-                          .append(ventasArchivo).append(" ventas\n");
+                if (!archivo.getTipo().contains("Error")) {
+                    long ventasArchivo = ventaRepo.countByArchivo(archivo);
+                    diagnostico.append("  ✅ ").append(archivo.getNombre())
+                              .append(" (").append(archivo.getTipo()).append("): ")
+                              .append(ventasArchivo).append(" ventas\n");
+                }
             }
             
             diagnostico.append("\n✅ Conexión a base de datos: OK");
+            diagnostico.append("\n💡 IOUtils límite configurado: 200MB para archivos Excel grandes");
             
         } catch (Exception e) {
             diagnostico.append("❌ Error en diagnóstico: ").append(e.getMessage()).append("\n");

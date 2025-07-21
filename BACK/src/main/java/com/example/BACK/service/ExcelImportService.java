@@ -9,6 +9,7 @@ import java.util.List;
 
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.util.IOUtils;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -55,7 +56,18 @@ public class ExcelImportService {
             try (InputStream inputStream = drive.files().get(archivo.getId()).executeMediaAsInputStream()) {
                 List<Venta> ventas = procesarReporteVentas(inputStream, nombreArchivo);
                 resultados.add(new ImportResultDTO(nombreArchivo, "Excel", ventas));
+                System.out.println("✅ Archivo Excel procesado exitosamente: " + nombreArchivo);
             } catch (Exception e) {
+                System.err.println("❌ Error al procesar archivo Excel: " + nombreArchivo + " - " + e.getMessage());
+                if (e.getMessage() != null && e.getMessage().contains("allocate an array")) {
+                    System.err.println("💡 El archivo " + nombreArchivo + " es demasiado grande. Considere dividirlo en partes más pequeñas.");
+                    // Registrar el archivo como procesado para evitar intentos repetidos
+                    try {
+                        archivoRepo.save(new ArchivoProcesado(nombreArchivo, "Excel-Error-TamañoGrande", LocalDateTime.now()));
+                    } catch (Exception saveError) {
+                        System.err.println("⚠️ No se pudo registrar archivo con error: " + saveError.getMessage());
+                    }
+                }
                 e.printStackTrace();
             }
         }
@@ -65,9 +77,22 @@ public class ExcelImportService {
 
     public List<Venta> procesarReporteVentas(InputStream inputStream, String nombreArchivo) throws Exception {
         List<Venta> ventas = new ArrayList<>();
-        Workbook workbook = nombreArchivo.toLowerCase().endsWith(".xls")
-            ? new HSSFWorkbook(inputStream)
-            : new XSSFWorkbook(inputStream);
+        
+        // Configurar límite más alto para archivos Excel grandes
+        IOUtils.setByteArrayMaxOverride(200_000_000); // 200MB límite
+        
+        Workbook workbook = null;
+        try {
+            workbook = nombreArchivo.toLowerCase().endsWith(".xls")
+                ? new HSSFWorkbook(inputStream)
+                : new XSSFWorkbook(inputStream);
+        } catch (Exception e) {
+            System.err.println("❌ Error al procesar archivo Excel: " + nombreArchivo + " - " + e.getMessage());
+            if (e.getMessage().contains("allocate an array")) {
+                System.err.println("💡 Archivo demasiado grande. Considere dividir el archivo en partes más pequeñas.");
+            }
+            throw new RuntimeException("Error al procesar archivo Excel: " + e.getMessage(), e);
+        }
 
         Sheet sheet = workbook.getSheet("FINAL");
         if (sheet == null) return ventas;
