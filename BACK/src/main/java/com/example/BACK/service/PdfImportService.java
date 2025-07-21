@@ -89,11 +89,30 @@ public class PdfImportService {
                 ventasArchivo = procesarFormatoGenerico(contenido, archivoProcesado);
             }
 
+            System.out.println("📊 Procesando " + ventasArchivo.size() + " ventas del archivo: " + nombreArchivo);
+            
             for (Venta venta : ventasArchivo) {
-                if (!ventaRepo.existsByClienteAndProductoAndFecha(venta.getCliente(), venta.getProducto(), venta.getFecha())) {
-                    ventaRepo.save(venta);
+                try {
+                    if (venta.getCliente() == null || venta.getProducto() == null) {
+                        System.err.println("❌ Venta inválida - Cliente o Producto es null: " + venta);
+                        continue;
+                    }
+                    
+                    if (!ventaRepo.existsByClienteAndProductoAndFecha(venta.getCliente(), venta.getProducto(), venta.getFecha())) {
+                        Venta ventaGuardada = ventaRepo.save(venta);
+                        System.out.println("✅ Venta guardada: " + ventaGuardada.getId());
+                    } else {
+                        System.out.println("⚠️ Venta duplicada, no se guardó: " + venta.getCliente().getCustomerCode() + " - " + venta.getProducto().getCode());
+                    }
+                } catch (Exception e) {
+                    System.err.println("❌ Error al guardar venta: " + e.getMessage());
+                    e.printStackTrace();
                 }
             }
+        } catch (Exception e) {
+            System.err.println("❌ Error al procesar PDF: " + nombreArchivo + " - " + e.getMessage());
+            e.printStackTrace();
+            throw e;
         }
         return ventasArchivo;
     }
@@ -220,25 +239,57 @@ public class PdfImportService {
 
     
     private Customer obtenerCliente(String code, String name) {
-        if (code == null || name == null) return null;
-        return customerRepo.findByCustomerCode(code).orElseGet(() -> {
-            Customer nuevo = new Customer();
-            nuevo.setCustomerCode(code);
-            nuevo.setName(name);
-            return customerRepo.save(nuevo);
+        if (code == null || name == null) {
+            System.err.println("❌ Datos de cliente inválidos - Code: " + code + ", Name: " + name);
+            return null;
+        }
+        
+        final String finalCode = code;
+        final String finalName = name;
+        
+        return customerRepo.findByCustomerCode(finalCode).orElseGet(() -> {
+            try {
+                Customer nuevo = new Customer();
+                nuevo.setCustomerCode(finalCode);
+                nuevo.setName(finalName);
+                Customer clienteGuardado = customerRepo.save(nuevo);
+                System.out.println("✅ Cliente creado: " + clienteGuardado.getCustomerCode() + " - " + clienteGuardado.getName());
+                return clienteGuardado;
+            } catch (Exception e) {
+                System.err.println("❌ Error al crear cliente: " + finalCode + " - " + e.getMessage());
+                e.printStackTrace();
+                return null;
+            }
         });
     }
 
     private Product obtenerProducto(String code, String desc, BigDecimal precio) {
-        return productRepo.findById(code).orElseGet(() -> {
-            Product nuevo = new Product();
-            nuevo.setCode(code);
-            nuevo.setDescription(desc);
-            nuevo.setPrice(precio);
-            nuevo.setCreatedAt(Timestamp.valueOf(LocalDateTime.now()));
-            Family familia = familyRepo.findByName("General").orElseGet(() -> familyRepo.save(new Family("General")));
-            nuevo.setFamily(familia);
-            return productRepo.save(nuevo);
+        final String finalCode = (code == null || code.trim().isEmpty()) ? "AUTO-" + System.currentTimeMillis() : code;
+        final String finalDesc = desc != null ? desc : "Descripción no disponible";
+        final BigDecimal finalPrecio = precio != null ? precio : BigDecimal.ZERO;
+        
+        return productRepo.findById(finalCode).orElseGet(() -> {
+            try {
+                Product nuevo = new Product();
+                nuevo.setCode(finalCode);
+                nuevo.setDescription(finalDesc);
+                nuevo.setPrice(finalPrecio);
+                nuevo.setCreatedAt(Timestamp.valueOf(LocalDateTime.now()));
+                
+                Family familia = familyRepo.findByName("General").orElseGet(() -> {
+                    Family nuevaFamilia = new Family("General");
+                    return familyRepo.save(nuevaFamilia);
+                });
+                nuevo.setFamily(familia);
+                
+                Product productoGuardado = productRepo.save(nuevo);
+                System.out.println("✅ Producto creado: " + productoGuardado.getCode());
+                return productoGuardado;
+            } catch (Exception e) {
+                System.err.println("❌ Error al crear producto: " + finalCode + " - " + e.getMessage());
+                e.printStackTrace();
+                return null;
+            }
         });
     }
 
