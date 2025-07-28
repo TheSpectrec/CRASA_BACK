@@ -60,7 +60,7 @@ public class CustomerController {
             if (newCustomer.getProductos() != null && !newCustomer.getProductos().isEmpty()) {
                 List<Product> productosValidados = new ArrayList<>();
                 for (Product p : newCustomer.getProductos()) {
-                    productService.findById(p.getCode()).ifPresent(productosValidados::add);
+                    productService.findByProductCode(p.getProductCode()).ifPresent(productosValidados::add);
                 }
                 newCustomer.setProductos(productosValidados);
             }
@@ -99,7 +99,7 @@ public class CustomerController {
         if (updatedCustomer.getProductos() != null) {
             List<Product> productosValidados = new ArrayList<>();
             for (Product p : updatedCustomer.getProductos()) {
-                productService.findById(p.getCode()).ifPresent(productosValidados::add);
+                productService.findByProductCode(p.getProductCode()).ifPresent(productosValidados::add);
             }
             existing.setProductos(productosValidados);
         }

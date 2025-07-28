@@ -25,7 +25,7 @@ import jakarta.annotation.PostConstruct;
 @Service
 public class GoogleDriveService {
 
-    private static final int TIMEOUT = 3 * 60000; // 3 minutos
+    private static final int TIMEOUT = 1 * 60000; // 1 minutos
     private Drive drive;
 
     @PostConstruct

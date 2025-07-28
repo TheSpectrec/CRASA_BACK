@@ -8,8 +8,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
@@ -22,9 +21,9 @@ public class Mark extends BaseEntity {
 
     private String name;
 
-    @ManyToOne
-    @JoinColumn(name = "company_id", nullable = false)
-    private Company company;
+    @ManyToMany(mappedBy = "marks")
+    @JsonIgnoreProperties("marks")
+    private List<Company> companies;
 
     @OneToMany(mappedBy = "mark")
 @JsonIgnoreProperties("mark")
@@ -46,6 +45,13 @@ public void setFamilies(List<Family> families) {
     this.families = families;
 }
 
+    public List<Company> getCompanies() {
+        return companies;
+    }
+    public void setCompanies(List<Company> companies) {
+        this.companies = companies;
+    }
+
 
     public String getId() {
         return id;
@@ -55,20 +61,12 @@ public void setFamilies(List<Family> families) {
         return name;
     }
 
-    public Company getCompany() {
-        return company;
-    }
-
     public void setId(String id) {
         this.id = id;
     }
 
     public void setName(String name) {
         this.name = name;
-    }
-
-    public void setCompany(Company company) {
-        this.company = company;
     }
 }
 

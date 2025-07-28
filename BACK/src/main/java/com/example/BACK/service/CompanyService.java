@@ -20,17 +20,17 @@ public class CompanyService {
     public void delete(String id) { repo.deleteById(id); }
     public Optional<Company> findById(String id) { return repo.findById(id); }
     public List<Company> findByProductId(String productCode) {
-    return findAll().stream()
-        .filter(company -> company.getMarks() != null &&
-            company.getMarks().stream().anyMatch(mark ->
-                mark.getFamilies() != null && mark.getFamilies().stream().anyMatch(family ->
-                    family.getProducts() != null &&
-                    family.getProducts().stream().anyMatch(p -> p.getCode().equals(productCode))
+        return findAll().stream()
+            .filter(company -> company.getMarks() != null &&
+                company.getMarks().stream().anyMatch(mark ->
+                    mark.getFamilies() != null && mark.getFamilies().stream().anyMatch(family ->
+                        family.getProducts() != null &&
+                        family.getProducts().stream().anyMatch(p -> p.getProductCode().equals(productCode))
+                    )
                 )
             )
-        )
-        .collect(Collectors.toList());
-}
+            .collect(Collectors.toList());
+    }
 
 }
 

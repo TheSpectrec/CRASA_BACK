@@ -20,22 +20,22 @@ public class FamilyService {
     public void delete(String id) { repo.deleteById(id); }
     public Optional<Family> findById(String id) { return repo.findById(id); }
     public List<Family> findByCompanyId(String companyId) {
-    return repo.findAll().stream()
-            .filter(f -> f.getMark() != null && f.getMark().getCompany() != null && f.getMark().getCompany().getId().equals(companyId))
+        return repo.findAll().stream()
+            .filter(f -> f.getMark() != null && f.getMark().getCompanies() != null && f.getMark().getCompanies().stream().anyMatch(c -> c.getId().equals(companyId)))
             .collect(Collectors.toList());
-}
+    }
 
-public List<Family> findByMarkId(String markId) {
-    return repo.findAll().stream()
-            .filter(f -> f.getMark() != null && f.getMark().getId().equals(markId))
+    public List<Family> findByMarkId(String markId) {
+        return repo.findAll().stream()
+                .filter(f -> f.getMark() != null && f.getMark().getId().equals(markId))
+                .collect(Collectors.toList());
+    }
+
+    public List<Family> findByProductId(String productCode) {
+        return findAll().stream()
+            .filter(f -> f.getProducts() != null &&
+                         f.getProducts().stream().anyMatch(p -> p.getProductCode().equals(productCode)))
             .collect(Collectors.toList());
-}
-
-public List<Family> findByProductId(String productCode) {
-    return findAll().stream()
-        .filter(f -> f.getProducts() != null &&
-                     f.getProducts().stream().anyMatch(p -> p.getCode().equals(productCode)))
-        .collect(Collectors.toList());
-}
+    }
 
 }

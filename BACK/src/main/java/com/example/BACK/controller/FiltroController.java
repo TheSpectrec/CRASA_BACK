@@ -60,7 +60,7 @@ public class FiltroController {
     @GetMapping("/marcas/empresa/{companyId}")
     public List<Mark> getMarcasPorEmpresa(@PathVariable String companyId) {
         return markService.findAll().stream()
-                .filter(m -> m.getCompany() != null && m.getCompany().getId().equals(companyId))
+                .filter(m -> m.getCompanies() != null && m.getCompanies().stream().anyMatch(c -> c.getId().equals(companyId)))
                 .collect(Collectors.toList());
     }
 
@@ -84,9 +84,12 @@ public class FiltroController {
     @GetMapping("/empresa/producto/{productId}")
     public Company getEmpresaPorProducto(@PathVariable String productId) {
         return productService.findById(productId)
-                .map(p -> p.getFamily() != null && p.getFamily().getMark() != null
-                        ? p.getFamily().getMark().getCompany()
-                        : null)
+                .map(p -> {
+                    if (p.getFamily() != null && p.getFamily().getMark() != null && p.getFamily().getMark().getCompanies() != null && !p.getFamily().getMark().getCompanies().isEmpty()) {
+                        return p.getFamily().getMark().getCompanies().get(0); // Devuelve la primera empresa asociada
+                    }
+                    return null;
+                })
                 .orElse(null);
     }
 

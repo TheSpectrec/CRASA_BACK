@@ -20,11 +20,11 @@ public class CustomerService {
     public void delete(String id) { repo.deleteById(id); }
     public Optional<Customer> findById(String id) { return repo.findById(id); }
     public List<Customer> findByProductId(String productCode) {
-    return repo.findAll().stream()
-        .filter(c -> c.getProductos() != null &&
-            c.getProductos().stream().anyMatch(p -> p.getCode().equals(productCode)))
-        .collect(Collectors.toList());
-}
+        return repo.findAll().stream()
+            .filter(c -> c.getProductos() != null &&
+                c.getProductos().stream().anyMatch(p -> p.getProductCode().equals(productCode)))
+            .collect(Collectors.toList());
+    }
 
 public List<Customer> findByVendedorId(String vendedorId) {
     return repo.findAll().stream()

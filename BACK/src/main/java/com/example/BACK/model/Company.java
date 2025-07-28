@@ -8,7 +8,9 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 
 @Entity
@@ -20,9 +22,14 @@ public class Company extends BaseEntity {
 
     private String name;
 
-@OneToMany(mappedBy = "company")
-@JsonIgnoreProperties("company")
-private List<Mark> marks;
+    @ManyToMany
+    @JoinTable(
+        name = "company_mark",
+        joinColumns = @JoinColumn(name = "company_id"),
+        inverseJoinColumns = @JoinColumn(name = "mark_id")
+    )
+    @JsonIgnoreProperties("companies")
+    private List<Mark> marks;
 
 public Company() {}
 

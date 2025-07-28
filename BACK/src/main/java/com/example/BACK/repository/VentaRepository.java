@@ -24,9 +24,6 @@ public interface VentaRepository extends JpaRepository<Venta, String> {
     @Query("SELECT v FROM Venta v WHERE v.cliente.customerCode = :customerCode")
     List<Venta> findByCustomerCode(@Param("customerCode") String customerCode);
     
-    @Query("SELECT v FROM Venta v WHERE v.producto.code = :productCode")
-    List<Venta> findByProductCode(@Param("productCode") String productCode);
-    
     @Query("SELECT COUNT(v) FROM Venta v WHERE v.archivo = :archivo")
     long countByArchivo(@Param("archivo") ArchivoProcesado archivo);
     

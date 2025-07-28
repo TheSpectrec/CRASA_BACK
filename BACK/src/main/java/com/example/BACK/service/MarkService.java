@@ -20,18 +20,18 @@ public class MarkService {
     public void delete(String id) { repo.deleteById(id); }
     public Optional<Mark> findById(String id) { return repo.findById(id); }
     public List<Mark> findByCompanyId(String companyId) {
-    return repo.findAll().stream()
-        .filter(m -> m.getCompany() != null && m.getCompany().getId().equals(companyId))
-        .collect(Collectors.toList());
-}
-public List<Mark> findByProductId(String productCode) {
-    return findAll().stream()
-        .filter(m -> m.getFamilies() != null &&
-                     m.getFamilies().stream().anyMatch(f ->
-                         f.getProducts() != null &&
-                         f.getProducts().stream().anyMatch(p -> p.getCode().equals(productCode))))
-        .collect(Collectors.toList());
-}
+        return repo.findAll().stream()
+            .filter(m -> m.getCompanies() != null && m.getCompanies().stream().anyMatch(c -> c.getId().equals(companyId)))
+            .collect(Collectors.toList());
+    }
+    public List<Mark> findByProductId(String productCode) {
+        return findAll().stream()
+            .filter(m -> m.getFamilies() != null &&
+                         m.getFamilies().stream().anyMatch(f ->
+                             f.getProducts() != null &&
+                             f.getProducts().stream().anyMatch(p -> p.getProductCode().equals(productCode))))
+            .collect(Collectors.toList());
+    }
 
 
 }

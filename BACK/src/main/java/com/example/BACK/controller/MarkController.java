@@ -41,17 +41,15 @@ public class MarkController {
     }
 
     @PutMapping("/{id}")
-public ResponseEntity<Mark> update(@PathVariable String id, @RequestBody Mark m) {
-    return service.findById(id)
-            .map(existing -> {
-                existing.setName(m.getName());
-                existing.setCompany(m.getCompany());
-                return ResponseEntity.ok(service.save(existing));
-            })
-            .orElse(ResponseEntity.notFound().build());
-}
-
-
+    public ResponseEntity<Mark> update(@PathVariable String id, @RequestBody Mark m) {
+        return service.findById(id)
+                .map(existing -> {
+                    existing.setName(m.getName());
+                    existing.setCompanies(m.getCompanies());
+                    return ResponseEntity.ok(service.save(existing));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
 
     @DeleteMapping("/{id}")
     public void delete(@PathVariable String id) {
