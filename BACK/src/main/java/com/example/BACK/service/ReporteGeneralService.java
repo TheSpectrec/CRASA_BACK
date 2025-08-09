@@ -48,8 +48,8 @@ public class ReporteGeneralService {
         return reporteGeneralRepository.findByTipoReporte(tipoReporte);
     }
     
-    public List<ReporteGeneral> findByArchivoId(String archivoId) {
-        return reporteGeneralRepository.findByArchivoId(archivoId);
+    public List<ReporteGeneral> findByArchivoId(Long archivoId) {
+        return reporteGeneralRepository.findByArchivo_Id(archivoId);
     }
     
     // Métodos de consultas agregadas

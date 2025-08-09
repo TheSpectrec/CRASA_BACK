@@ -24,7 +24,7 @@ public interface ReporteGeneralRepository extends JpaRepository<ReporteGeneral, 
     List<ReporteGeneral> findByTipoReporte(String tipoReporte);
     
     // Buscar por archivo
-    List<ReporteGeneral> findByArchivoId(String archivoId);
+    List<ReporteGeneral> findByArchivo_Id(Long archivoId);
     
     // Consultas agregadas
     @Query("SELECT SUM(r.totalCajas) FROM ReporteGeneral r WHERE r.año = :año")
