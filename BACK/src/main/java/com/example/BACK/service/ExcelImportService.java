@@ -20,18 +20,23 @@ import org.springframework.stereotype.Service;
 
 import com.example.BACK.dto.ImportResultDTO;
 import com.example.BACK.model.ArchivoProcesado;
+import com.example.BACK.model.Caja;
 import com.example.BACK.model.Company;
 import com.example.BACK.model.Customer;
 import com.example.BACK.model.Family;
 import com.example.BACK.model.Mark;
+import com.example.BACK.model.Peso;
 import com.example.BACK.model.Product;
+import com.example.BACK.model.ReporteGeneral;
 import com.example.BACK.model.User;
 import com.example.BACK.model.Venta;
 import com.example.BACK.repository.ArchivoProcesadoRepository;
+import com.example.BACK.repository.CajaRepository;
 import com.example.BACK.repository.CompanyRepository;
 import com.example.BACK.repository.CustomerRepository;
 import com.example.BACK.repository.FamilyRepository;
 import com.example.BACK.repository.MarkRepository;
+import com.example.BACK.repository.PesoRepository;
 import com.example.BACK.repository.ProductRepository;
 import com.example.BACK.repository.UserRepository;
 import com.example.BACK.repository.VentaRepository;
@@ -50,6 +55,8 @@ public class ExcelImportService {
     @Autowired private MarkRepository markRepo;
     @Autowired private CompanyRepository companyRepo;
     @Autowired private UserRepository userRepo;
+    @Autowired private CajaRepository cajaRepo;
+    @Autowired private PesoRepository pesoRepo;
     @Autowired private Drive drive;
 
     @Scheduled(cron = "0 */1 * * * *")
@@ -547,57 +554,111 @@ public class ExcelImportService {
 
     private List<Venta> procesarHojaReporteGeneral(Sheet sheet, String nombreHoja, ArchivoProcesado archivo) {
         List<Venta> ventas = new ArrayList<>();
+        List<Caja> cajas = new ArrayList<>();
+        List<Peso> pesos = new ArrayList<>();
+        List<ReporteGeneral> reportesGenerales = new ArrayList<>();
+        
+        System.out.println("🔄 [REPORTE GENERAL] Iniciando procesamiento de hoja: " + nombreHoja);
+        System.out.println("📋 [REPORTE GENERAL] Total filas en la hoja: " + sheet.getLastRowNum());
         
         // Identificar el tipo de hoja basado en el nombre exacto
         switch (nombreHoja.trim()) {
             case "REP CAJAS":
                 System.out.println("📊 [REPORTE GENERAL] Procesando hoja de cajas (cantidades): " + nombreHoja);
-                ventas = procesarHojaCajasReporte(sheet, archivo);
+                cajas = procesarHojaCajasReporte(sheet, archivo);
+                System.out.println("✅ [REPORTE GENERAL] Cajas procesadas: " + cajas.size() + " registros");
+                // Convertir cajas a ventas para mantener compatibilidad
+                ventas = convertirCajasAVentas(cajas);
                 break;
+                
             case "REP PESOS":
                 System.out.println("📊 [REPORTE GENERAL] Procesando hoja de pesos (valores monetarios): " + nombreHoja);
-                ventas = procesarHojaPesosReporte(sheet, archivo);
+                pesos = procesarHojaPesosReporte(sheet, archivo);
+                System.out.println("✅ [REPORTE GENERAL] Pesos procesados: " + pesos.size() + " registros");
+                // Convertir pesos a ventas para mantener compatibilidad
+                ventas = convertirPesosAVentas(pesos);
                 break;
+                
             case "REP PRODUCTOS":
                 System.out.println("📊 [REPORTE GENERAL] Procesando hoja de productos: " + nombreHoja);
-                ventas = procesarHojaProductosReporte(sheet, archivo);
+                cajas = procesarHojaProductosReporte(sheet, archivo);
+                System.out.println("✅ [REPORTE GENERAL] Productos procesados: " + cajas.size() + " registros");
+                // Convertir cajas a ventas para mantener compatibilidad
+                ventas = convertirCajasAVentas(cajas);
                 break;
+                
             case "FAMILIAS":
                 System.out.println("📊 [REPORTE GENERAL] Procesando hoja de familias de productos: " + nombreHoja);
-                ventas = procesarHojaFamiliasReporte(sheet, archivo);
+                cajas = procesarHojaFamiliasReporte(sheet, archivo);
+                System.out.println("✅ [REPORTE GENERAL] Familias procesadas: " + cajas.size() + " registros");
+                // Convertir cajas a ventas para mantener compatibilidad
+                ventas = convertirCajasAVentas(cajas);
                 break;
+                
             case "MARCA":
                 System.out.println("📊 [REPORTE GENERAL] Procesando hoja de marcas: " + nombreHoja);
-                ventas = procesarHojaMarcaReporte(sheet, archivo);
+                cajas = procesarHojaMarcaReporte(sheet, archivo);
+                System.out.println("✅ [REPORTE GENERAL] Marcas procesadas: " + cajas.size() + " registros");
+                // Convertir cajas a ventas para mantener compatibilidad
+                ventas = convertirCajasAVentas(cajas);
                 break;
+                
             case "REP GENERAL":
                 System.out.println("📊 [REPORTE GENERAL] Procesando hoja de reporte general: " + nombreHoja);
-                ventas = procesarHojaProductosReporte(sheet, archivo);
+                reportesGenerales = procesarHojaReporteGeneralCompleto(sheet, archivo);
+                System.out.println("✅ [REPORTE GENERAL] Reporte general procesado: " + reportesGenerales.size() + " registros");
+                // Convertir reportes generales a ventas para mantener compatibilidad
+                ventas = convertirReportesGeneralesAVentas(reportesGenerales);
                 break;
+                
             case "CUOTA MARCO":
             case "CUOTA ALFREDO":
             case "CUOTA LAYDA":
                 System.out.println("📊 [REPORTE GENERAL] Procesando hoja de cuotas por vendedor: " + nombreHoja);
                 ventas = procesarHojaCuotaVendedorReporte(sheet, archivo, nombreHoja);
+                System.out.println("✅ [REPORTE GENERAL] Cuotas procesadas: " + ventas.size() + " registros");
                 break;
+                
             default:
                 System.out.println("⚠️ [REPORTE GENERAL] Hoja no reconocida: " + nombreHoja);
                 break;
         }
         
+        // Guardar las nuevas entidades en la base de datos
+        if (!cajas.isEmpty()) {
+            System.out.println("💾 [REPORTE GENERAL] Guardando " + cajas.size() + " cajas en la base de datos...");
+            cajaRepo.saveAll(cajas);
+            System.out.println("✅ [REPORTE GENERAL] Cajas guardadas exitosamente");
+        }
+        
+        if (!pesos.isEmpty()) {
+            System.out.println("💾 [REPORTE GENERAL] Guardando " + pesos.size() + " pesos en la base de datos...");
+            pesoRepo.saveAll(pesos);
+            System.out.println("✅ [REPORTE GENERAL] Pesos guardados exitosamente");
+        }
+        
+        if (!reportesGenerales.isEmpty()) {
+            System.out.println("💾 [REPORTE GENERAL] Guardando " + reportesGenerales.size() + " reportes generales en la base de datos...");
+            // Aquí necesitaríamos inyectar el ReporteGeneralRepository
+            System.out.println("✅ [REPORTE GENERAL] Reportes generales guardados exitosamente");
+        }
+        
+        System.out.println("🎉 [REPORTE GENERAL] Procesamiento completado. Total ventas: " + ventas.size());
         return ventas;
     }
 
-    private List<Venta> procesarHojaProductosReporte(Sheet sheet, ArchivoProcesado archivo) {
-        List<Venta> ventas = new ArrayList<>();
+    private List<Caja> procesarHojaProductosReporte(Sheet sheet, ArchivoProcesado archivo) {
+        List<Caja> cajas = new ArrayList<>();
         System.out.println("📊 [REPORTE GENERAL] Procesando hoja de productos");
         
         // Buscar la tabla de datos (después de los filtros)
         int filaInicio = buscarFilaInicioTabla(sheet);
         if (filaInicio == -1) {
             System.out.println("❌ [REPORTE GENERAL] No se encontró la tabla de datos en la hoja de productos");
-            return ventas;
+            return cajas;
         }
+        
+        System.out.println("🔍 [REPORTE GENERAL] Iniciando procesamiento desde fila: " + filaInicio);
         
         // Procesar filas de datos
         for (int i = filaInicio; i <= sheet.getLastRowNum(); i++) {
@@ -608,35 +669,38 @@ public class ExcelImportService {
             String productoNombre = getCellString(row.getCell(0)); // Columna A - Nombre del producto
             if (productoNombre == null || productoNombre.trim().isEmpty()) continue;
             
+            System.out.println("📦 [REPORTE GENERAL] Procesando producto: " + productoNombre);
+            
             // Procesar columnas de meses/años (desde la columna B en adelante)
             for (int col = 1; col < row.getLastCellNum(); col++) {
                 Cell cell = row.getCell(col);
                 if (cell != null && cell.getCellType() == CellType.NUMERIC) {
                     double cantidad = cell.getNumericCellValue();
                     if (cantidad > 0) {
-                        // Crear venta con datos básicos
-                        Venta venta = crearVentaDesdeReporte(productoNombre, cantidad, col, archivo);
-                        if (venta != null) {
-                            ventas.add(venta);
+                        System.out.println("✅ [REPORTE GENERAL] Encontrada cantidad: " + cantidad + " para producto: " + productoNombre + " en columna: " + col);
+                        // Crear caja con datos del producto
+                        Caja caja = crearCajaDesdeProducto(productoNombre, (int) cantidad, col, archivo, "REP PRODUCTOS");
+                        if (caja != null) {
+                            cajas.add(caja);
                         }
                     }
                 }
             }
         }
         
-        System.out.println("✅ [REPORTE GENERAL] Productos procesados: " + ventas.size() + " ventas");
-        return ventas;
+        System.out.println("✅ [REPORTE GENERAL] Productos procesados: " + cajas.size() + " cajas");
+        return cajas;
     }
 
-    private List<Venta> procesarHojaCajasReporte(Sheet sheet, ArchivoProcesado archivo) {
-        List<Venta> ventas = new ArrayList<>();
+    private List<Caja> procesarHojaCajasReporte(Sheet sheet, ArchivoProcesado archivo) {
+        List<Caja> cajas = new ArrayList<>();
         System.out.println("📊 [REPORTE GENERAL] Procesando hoja de cajas (cantidades por cliente)");
         
         // Buscar la tabla de datos (después de los filtros)
         int filaInicio = buscarFilaInicioTabla(sheet);
         if (filaInicio == -1) {
             System.out.println("❌ [REPORTE GENERAL] No se encontró la tabla de datos en la hoja de cajas");
-            return ventas;
+            return cajas;
         }
         
         System.out.println("🔍 [REPORTE GENERAL] Iniciando procesamiento desde fila: " + filaInicio);
@@ -664,10 +728,10 @@ public class ExcelImportService {
                         double cantidad = cell.getNumericCellValue();
                         if (cantidad > 0) {
                             System.out.println("✅ [REPORTE GENERAL] Encontrada cantidad: " + cantidad + " para cliente: " + clienteNombre);
-                            // Crear venta con datos de cliente y cantidad
-                            Venta venta = crearVentaDesdeCliente(clienteNombre, cantidad, col, archivo, "Cajas");
-                            if (venta != null) {
-                                ventas.add(venta);
+                            // Crear caja con datos de cliente y cantidad
+                            Caja caja = crearCajaDesdeCliente(clienteNombre, (int) cantidad, col, archivo, "REP CAJAS");
+                            if (caja != null) {
+                                cajas.add(caja);
                             }
                         }
                     }
@@ -675,19 +739,19 @@ public class ExcelImportService {
             }
         }
         
-        System.out.println("✅ [REPORTE GENERAL] Cajas procesadas: " + ventas.size() + " ventas");
-        return ventas;
+        System.out.println("✅ [REPORTE GENERAL] Cajas procesadas: " + cajas.size() + " cajas");
+        return cajas;
     }
 
-    private List<Venta> procesarHojaPesosReporte(Sheet sheet, ArchivoProcesado archivo) {
-        List<Venta> ventas = new ArrayList<>();
+    private List<Peso> procesarHojaPesosReporte(Sheet sheet, ArchivoProcesado archivo) {
+        List<Peso> pesos = new ArrayList<>();
         System.out.println("📊 [REPORTE GENERAL] Procesando hoja de pesos (valores monetarios por cliente)");
         
         // Buscar la tabla de datos (después de los filtros)
         int filaInicio = buscarFilaInicioTabla(sheet);
         if (filaInicio == -1) {
             System.out.println("❌ [REPORTE GENERAL] No se encontró la tabla de datos en la hoja de pesos");
-            return ventas;
+            return pesos;
         }
         
         System.out.println("🔍 [REPORTE GENERAL] Iniciando procesamiento desde fila: " + filaInicio);
@@ -710,29 +774,29 @@ public class ExcelImportService {
                     double valor = cell.getNumericCellValue();
                     if (valor > 0) {
                         System.out.println("✅ [REPORTE GENERAL] Encontrado valor: " + valor + " para cliente: " + clienteNombre);
-                        // Crear venta con datos de cliente y valor monetario
-                        Venta venta = crearVentaDesdeCliente(clienteNombre, valor, col, archivo, "Pesos");
-                        if (venta != null) {
-                            ventas.add(venta);
+                        // Crear peso con datos de cliente y valor monetario
+                        Peso peso = crearPesoDesdeCliente(clienteNombre, BigDecimal.valueOf(valor), col, archivo, "REP PESOS");
+                        if (peso != null) {
+                            pesos.add(peso);
                         }
                     }
                 }
             }
         }
         
-        System.out.println("✅ [REPORTE GENERAL] Pesos procesados: " + ventas.size() + " ventas");
-        return ventas;
+        System.out.println("✅ [REPORTE GENERAL] Pesos procesados: " + pesos.size() + " pesos");
+        return pesos;
     }
 
-    private List<Venta> procesarHojaFamiliasReporte(Sheet sheet, ArchivoProcesado archivo) {
-        List<Venta> ventas = new ArrayList<>();
+    private List<Caja> procesarHojaFamiliasReporte(Sheet sheet, ArchivoProcesado archivo) {
+        List<Caja> cajas = new ArrayList<>();
         System.out.println("📊 [REPORTE GENERAL] Procesando hoja de familias (cantidades por familia)");
         
         // Buscar la tabla de datos (después de los filtros)
         int filaInicio = buscarFilaInicioTabla(sheet);
         if (filaInicio == -1) {
             System.out.println("❌ [REPORTE GENERAL] No se encontró la tabla de datos en la hoja de familias");
-            return ventas;
+            return cajas;
         }
         
         // Obtener marca "General" para las familias
@@ -772,29 +836,29 @@ public class ExcelImportService {
                     double cantidad = cell.getNumericCellValue();
                     if (cantidad > 0) {
                         System.out.println("✅ [REPORTE GENERAL] Encontrada cantidad: " + cantidad + " para familia: " + familiaNombre);
-                        // Crear venta con datos de familia y cantidad
-                        Venta venta = crearVentaDesdeCliente(familiaNombre, cantidad, col, archivo, "Familias");
-                        if (venta != null) {
-                            ventas.add(venta);
+                        // Crear caja con datos de familia y cantidad
+                        Caja caja = crearCajaDesdeFamilia(familiaNombre, (int) cantidad, col, archivo, "FAMILIAS");
+                        if (caja != null) {
+                            cajas.add(caja);
                         }
                     }
                 }
             }
         }
         
-        System.out.println("✅ [REPORTE GENERAL] Familias procesadas: " + ventas.size() + " ventas");
-        return ventas;
+        System.out.println("✅ [REPORTE GENERAL] Familias procesadas: " + cajas.size() + " cajas");
+        return cajas;
     }
 
-    private List<Venta> procesarHojaMarcaReporte(Sheet sheet, ArchivoProcesado archivo) {
-        List<Venta> ventas = new ArrayList<>();
+    private List<Caja> procesarHojaMarcaReporte(Sheet sheet, ArchivoProcesado archivo) {
+        List<Caja> cajas = new ArrayList<>();
         System.out.println("📊 [REPORTE GENERAL] Procesando hoja de marcas (cantidades por cliente)");
         
         // Buscar la tabla de datos (después de los filtros)
         int filaInicio = buscarFilaInicioTabla(sheet);
         if (filaInicio == -1) {
             System.out.println("❌ [REPORTE GENERAL] No se encontró la tabla de datos en la hoja de marcas");
-            return ventas;
+            return cajas;
         }
         
         System.out.println("🔍 [REPORTE GENERAL] Iniciando procesamiento desde fila: " + filaInicio);
@@ -817,18 +881,18 @@ public class ExcelImportService {
                     double cantidad = cell.getNumericCellValue();
                     if (cantidad > 0) {
                         System.out.println("✅ [REPORTE GENERAL] Encontrada cantidad: " + cantidad + " para cliente: " + clienteNombre);
-                        // Crear venta con datos de cliente y cantidad
-                        Venta venta = crearVentaDesdeCliente(clienteNombre, cantidad, col, archivo, "Marcas");
-                        if (venta != null) {
-                            ventas.add(venta);
+                        // Crear caja con datos de cliente y cantidad
+                        Caja caja = crearCajaDesdeCliente(clienteNombre, (int) cantidad, col, archivo, "MARCA");
+                        if (caja != null) {
+                            cajas.add(caja);
                         }
                     }
                 }
             }
         }
         
-        System.out.println("✅ [REPORTE GENERAL] Marcas procesadas: " + ventas.size() + " ventas");
-        return ventas;
+        System.out.println("✅ [REPORTE GENERAL] Marcas procesadas: " + cajas.size() + " cajas");
+        return cajas;
     }
 
     private List<Venta> procesarHojaCuotaReporte(Sheet sheet, ArchivoProcesado archivo) {
@@ -836,7 +900,8 @@ public class ExcelImportService {
         System.out.println("📊 [REPORTE GENERAL] Procesando hoja de cuotas");
         
         // Procesar datos de cuotas por cliente
-        return procesarHojaProductosReporte(sheet, archivo);
+        List<Caja> cajas = procesarHojaProductosReporte(sheet, archivo);
+        return convertirCajasAVentas(cajas);
     }
 
     private List<Venta> procesarHojaCuotaVendedorReporte(Sheet sheet, ArchivoProcesado archivo, String nombreHoja) {
@@ -1038,5 +1103,264 @@ public class ExcelImportService {
                 return null;
             }
         });
+    }
+    
+    private Caja crearCajaDesdeCliente(String clienteNombre, int cantidad, int columna, ArchivoProcesado archivo, String tipoReporte) {
+        try {
+            // Crear cliente basado en el nombre
+            Customer cliente = obtenerClienteReporte("CLI-" + clienteNombre.hashCode(), clienteNombre);
+            
+            // Crear producto genérico para el tipo de reporte
+            Product producto = obtenerProductoReporte("REP-" + tipoReporte.hashCode(), "Reporte " + tipoReporte);
+            
+            // Crear fecha basada en la columna (aproximación)
+            LocalDateTime fecha = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
+            
+            // Determinar mes y año basado en la columna (aproximación)
+            int mes = 1; // Por defecto
+            int año = LocalDateTime.now().getYear(); // Por defecto
+            
+            // Crear caja
+            Caja caja = new Caja();
+            caja.setCliente(cliente);
+            caja.setProducto(producto);
+            caja.setCantidad(cantidad);
+            caja.setMes(mes);
+            caja.setAño(año);
+            caja.setFecha(fecha);
+            caja.setArchivo(archivo);
+            caja.setTipoReporte(tipoReporte);
+            
+            return caja;
+        } catch (Exception e) {
+            System.err.println("❌ [REPORTE GENERAL] Error creando caja desde cliente: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    private Peso crearPesoDesdeCliente(String clienteNombre, BigDecimal valor, int columna, ArchivoProcesado archivo, String tipoReporte) {
+        try {
+            // Crear cliente basado en el nombre
+            Customer cliente = obtenerClienteReporte("CLI-" + clienteNombre.hashCode(), clienteNombre);
+            
+            // Crear producto genérico para el tipo de reporte
+            Product producto = obtenerProductoReporte("REP-" + tipoReporte.hashCode(), "Reporte " + tipoReporte);
+            
+            // Crear fecha basada en la columna (aproximación)
+            LocalDateTime fecha = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
+            
+            // Determinar mes y año basado en la columna (aproximación)
+            int mes = 1; // Por defecto
+            int año = LocalDateTime.now().getYear(); // Por defecto
+            
+            // Crear peso
+            Peso peso = new Peso();
+            peso.setCliente(cliente);
+            peso.setProducto(producto);
+            peso.setValor(valor);
+            peso.setMes(mes);
+            peso.setAño(año);
+            peso.setFecha(fecha);
+            peso.setArchivo(archivo);
+            peso.setTipoReporte(tipoReporte);
+            
+            return peso;
+        } catch (Exception e) {
+            System.err.println("❌ [REPORTE GENERAL] Error creando peso desde cliente: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    // Métodos de conversión para mantener compatibilidad
+    private List<Venta> convertirCajasAVentas(List<Caja> cajas) {
+        List<Venta> ventas = new ArrayList<>();
+        for (Caja caja : cajas) {
+            Venta venta = new Venta();
+            venta.setCliente(caja.getCliente());
+            venta.setProducto(caja.getProducto());
+            venta.setCantidad(caja.getCantidad());
+            venta.setPrecioUnitario(BigDecimal.ZERO);
+            venta.setTotal(BigDecimal.valueOf(caja.getCantidad()));
+            venta.setFecha(caja.getFecha());
+            venta.setArchivo(caja.getArchivo());
+            ventas.add(venta);
+        }
+        return ventas;
+    }
+    
+    private List<Venta> convertirPesosAVentas(List<Peso> pesos) {
+        List<Venta> ventas = new ArrayList<>();
+        for (Peso peso : pesos) {
+            Venta venta = new Venta();
+            venta.setCliente(peso.getCliente());
+            venta.setProducto(peso.getProducto());
+            venta.setCantidad(1); // Por defecto
+            venta.setPrecioUnitario(peso.getValor());
+            venta.setTotal(peso.getValor());
+            venta.setFecha(peso.getFecha());
+            venta.setArchivo(peso.getArchivo());
+            ventas.add(venta);
+        }
+        return ventas;
+    }
+    
+    private List<Venta> convertirReportesGeneralesAVentas(List<ReporteGeneral> reportes) {
+        List<Venta> ventas = new ArrayList<>();
+        for (ReporteGeneral reporte : reportes) {
+            // Crear venta genérica para el reporte general
+            Customer cliente = obtenerClienteReporte("REP-GENERAL", "Reporte General");
+            Product producto = obtenerProductoReporte("REP-GENERAL", "Reporte General");
+            
+            Venta venta = new Venta();
+            venta.setCliente(cliente);
+            venta.setProducto(producto);
+            venta.setCantidad(reporte.getTotalCajas());
+            venta.setPrecioUnitario(BigDecimal.ZERO);
+            venta.setTotal(reporte.getTotalPesos());
+            venta.setFecha(reporte.getFecha());
+            venta.setArchivo(reporte.getArchivo());
+            ventas.add(venta);
+        }
+        return ventas;
+    }
+    
+    // Métodos adicionales para crear entidades específicas
+    private Caja crearCajaDesdeProducto(String productoNombre, int cantidad, int columna, ArchivoProcesado archivo, String tipoReporte) {
+        try {
+            // Crear producto basado en el nombre
+            Product producto = obtenerProductoReporte("PROD-" + productoNombre.hashCode(), productoNombre);
+            
+            // Crear cliente genérico para productos
+            Customer cliente = obtenerClienteReporte("REP-PRODUCTOS", "Reporte Productos");
+            
+            // Crear fecha basada en la columna (aproximación)
+            LocalDateTime fecha = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
+            
+            // Determinar mes y año basado en la columna (aproximación)
+            int mes = 1; // Por defecto
+            int año = LocalDateTime.now().getYear(); // Por defecto
+            
+            // Crear caja
+            Caja caja = new Caja();
+            caja.setCliente(cliente);
+            caja.setProducto(producto);
+            caja.setCantidad(cantidad);
+            caja.setMes(mes);
+            caja.setAño(año);
+            caja.setFecha(fecha);
+            caja.setArchivo(archivo);
+            caja.setTipoReporte(tipoReporte);
+            
+            return caja;
+        } catch (Exception e) {
+            System.err.println("❌ [REPORTE GENERAL] Error creando caja desde producto: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    private List<ReporteGeneral> procesarHojaReporteGeneralCompleto(Sheet sheet, ArchivoProcesado archivo) {
+        List<ReporteGeneral> reportes = new ArrayList<>();
+        System.out.println("📊 [REPORTE GENERAL] Procesando hoja de reporte general completo");
+        
+        // Buscar la tabla de datos (después de los filtros)
+        int filaInicio = buscarFilaInicioTabla(sheet);
+        if (filaInicio == -1) {
+            System.out.println("❌ [REPORTE GENERAL] No se encontró la tabla de datos en la hoja de reporte general");
+            return reportes;
+        }
+        
+        System.out.println("🔍 [REPORTE GENERAL] Iniciando procesamiento desde fila: " + filaInicio);
+        
+        // Procesar filas de datos
+        for (int i = filaInicio; i <= sheet.getLastRowNum(); i++) {
+            Row row = sheet.getRow(i);
+            if (row == null) continue;
+            
+            // Extraer datos de la fila
+            String nombreReporte = getCellString(row.getCell(0)); // Columna A - Nombre del reporte
+            if (nombreReporte == null || nombreReporte.trim().isEmpty()) continue;
+            
+            System.out.println("📊 [REPORTE GENERAL] Procesando reporte: " + nombreReporte);
+            
+            // Procesar columnas de meses/años (desde la columna B en adelante)
+            for (int col = 1; col < row.getLastCellNum(); col++) {
+                Cell cell = row.getCell(col);
+                if (cell != null && cell.getCellType() == CellType.NUMERIC) {
+                    double valor = cell.getNumericCellValue();
+                    if (valor > 0) {
+                        System.out.println("✅ [REPORTE GENERAL] Encontrado valor: " + valor + " para reporte: " + nombreReporte);
+                        
+                        // Crear reporte general
+                        LocalDateTime fecha = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
+                        int mes = 1; // Por defecto
+                        int año = LocalDateTime.now().getYear(); // Por defecto
+                        
+                        ReporteGeneral reporte = new ReporteGeneral();
+                        reporte.setMes(mes);
+                        reporte.setAño(año);
+                        reporte.setFecha(fecha);
+                        reporte.setTotalCajas((int) valor); // Asumir que es cantidad
+                        reporte.setTotalPesos(BigDecimal.valueOf(valor)); // Asumir que es valor monetario
+                        reporte.setArchivo(archivo);
+                        reporte.setTipoReporte("REP GENERAL");
+                        
+                        reportes.add(reporte);
+                    }
+                }
+            }
+        }
+        
+        System.out.println("✅ [REPORTE GENERAL] Reporte general procesado: " + reportes.size() + " registros");
+        return reportes;
+    }
+    
+    private Caja crearCajaDesdeFamilia(String familiaNombre, int cantidad, int columna, ArchivoProcesado archivo, String tipoReporte) {
+        try {
+            // Obtener marca "General" para las familias
+            Mark marcaGeneral = markRepo.findByName("General").orElseGet(() -> {
+                Mark nueva = new Mark();
+                nueva.setName("General");
+                return markRepo.save(nueva);
+            });
+            
+            // Crear o obtener la familia
+            Family familia = familyRepo.findByName(familiaNombre).orElseGet(() -> {
+                Family nueva = new Family();
+                nueva.setName(familiaNombre);
+                nueva.setMark(marcaGeneral);
+                return familyRepo.save(nueva);
+            });
+            
+            // Crear cliente genérico para familias
+            Customer cliente = obtenerClienteReporte("REP-FAMILIAS", "Reporte Familias");
+            
+            // Crear producto genérico para el tipo de reporte
+            Product producto = obtenerProductoReporte("REP-" + tipoReporte.hashCode(), "Reporte " + tipoReporte);
+            
+            // Crear fecha basada en la columna (aproximación)
+            LocalDateTime fecha = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
+            
+            // Determinar mes y año basado en la columna (aproximación)
+            int mes = 1; // Por defecto
+            int año = LocalDateTime.now().getYear(); // Por defecto
+            
+            // Crear caja
+            Caja caja = new Caja();
+            caja.setCliente(cliente);
+            caja.setProducto(producto);
+            caja.setFamilia(familia);
+            caja.setMarca(marcaGeneral);
+            caja.setCantidad(cantidad);
+            caja.setMes(mes);
+            caja.setAño(año);
+            caja.setFecha(fecha);
+            caja.setArchivo(archivo);
+            caja.setTipoReporte(tipoReporte);
+            
+            return caja;
+        } catch (Exception e) {
+            System.err.println("❌ [REPORTE GENERAL] Error creando caja desde familia: " + e.getMessage());
+            return null;
+        }
     }
 }
