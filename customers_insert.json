@@ -1,0 +1,416 @@
+{
+  "customers": [
+    {
+      "customerCode": "100914",
+      "name": "SERVICIO COMERCIAL GARIS SA DE CV"
+    },
+    {
+      "customerCode": "103621",
+      "name": "ABARROTERA SAN ANTONIO SA DE CV"
+    },
+    {
+      "customerCode": "1002311",
+      "name": "ABARROTERA FUENTES, S.A. DE C.V."
+    },
+    {
+      "customerCode": "1002503",
+      "name": "CRASA REPRESENTACIONES, SA DE CV"
+    },
+    {
+      "customerCode": "1005100",
+      "name": "NIETO COMERCIAL Y CIA"
+    },
+    {
+      "customerCode": "1005102",
+      "name": "ABARROTERA SAN ANTONIO SA DE CV"
+    },
+    {
+      "customerCode": "1005813",
+      "name": "ALITALICA, SA DE CV"
+    },
+    {
+      "customerCode": "1007538",
+      "name": "ELIZABETH AVELLANEDA CHAVEZ"
+    },
+    {
+      "customerCode": "1008663",
+      "name": "GRUPO ABARROTERO REX SA DE CV"
+    },
+    {
+      "customerCode": "1009295",
+      "name": "ABARROTES CASA VARGAS SUC CUAUTLA"
+    },
+    {
+      "customerCode": "1009552",
+      "name": "SERVICIO COMERCIAL GARIS SA DE CV"
+    },
+    {
+      "customerCode": "1009692",
+      "name": "ABARROTES CASA VARGAS SUC GALEANA"
+    },
+    {
+      "customerCode": "1010343",
+      "name": "TIENDAS TRES B, SA DE CV"
+    },
+    {
+      "customerCode": "1011214",
+      "name": "DICONSA ALMACEN 1711 ATLATLAHUCAN"
+    },
+    {
+      "customerCode": "1011255",
+      "name": "DICONSA ALMACEN 1215 HUITZUCO"
+    },
+    {
+      "customerCode": "1011256",
+      "name": "DICONSA ALMACEN 1221 TELOLOAPAN"
+    },
+    {
+      "customerCode": "1011257",
+      "name": "DICONSA ALMACEN 1223 TLAPEHUALA"
+    },
+    {
+      "customerCode": "1013471",
+      "name": "ABARROTERA FUENTES PALMAS"
+    },
+    {
+      "customerCode": "1013472",
+      "name": "ABARROTERA FUENTES JOJUTLA CENTRO"
+    },
+    {
+      "customerCode": "1013473",
+      "name": "ABARROTERA FUENTES GALEANA"
+    },
+    {
+      "customerCode": "1013474",
+      "name": "ABARROTERA FUENTES YAUTEPEC"
+    },
+    {
+      "customerCode": "1013476",
+      "name": "ABARROTERA FUENTES ZACARIAS"
+    },
+    {
+      "customerCode": "1013478",
+      "name": "ABARROTERA FUENTES PTE IXTLA CENTRO"
+    },
+    {
+      "customerCode": "1013479",
+      "name": "ABARROTERA FUENTES PTE IXTLA MERCADO"
+    },
+    {
+      "customerCode": "1013480",
+      "name": "ABARROTERA FUENTES GUALUPITA"
+    },
+    {
+      "customerCode": "1013481",
+      "name": "ABARROTERA FUENTES PLAZA SOL"
+    },
+    {
+      "customerCode": "1013482",
+      "name": "ABARROTERA FUENTES FLORES MAGON"
+    },
+    {
+      "customerCode": "1015559",
+      "name": "ABARROTERA FUENTES OAXTEPEC"
+    },
+    {
+      "customerCode": "1020309",
+      "name": "ABARROTERA FUENTES TEMIXCO "
+    },
+    {
+      "customerCode": "128113",
+      "name": "NIETO COMERCIAL Y CIA"
+    },
+    {
+      "customerCode": "128182",
+      "name": "CASA ALONSO DE CUERNAVACA SA  DE CV"
+    },
+    {
+      "customerCode": "335401",
+      "name": "ABARROTERA SAN ANTONIO SA DE CV"
+    },
+    {
+      "customerCode": "368300",
+      "name": "SERVICIO COMERCIAL GARIS SA DE CV"
+    },
+    {
+      "customerCode": "376733",
+      "name": "ABARROTERA FUENTES MOYOTEPEC"
+    },
+    {
+      "customerCode": "376734",
+      "name": "ABARROTERA FUENTES PTE IXTLA CENTRO"
+    },
+    {
+      "customerCode": "376735",
+      "name": "ABARROTERA FUENTES GALEANA"
+    },
+    {
+      "customerCode": "379784",
+      "name": "ABARROTERA FUENTES, S.A. DE C.V."
+    },
+    {
+      "customerCode": "381291",
+      "name": "OLEA PEÑALOZA JAIME"
+    },
+    {
+      "customerCode": "388261",
+      "name": "MA. DEL CARMEN BEIZA GARCIA"
+    },
+    {
+      "customerCode": "388270",
+      "name": "ELIZABETH AVELLANEDA CHAVEZ"
+    },
+    {
+      "customerCode": "394439",
+      "name": "CRASA REPRESENTACIONES, SA DE CV"
+    },
+    {
+      "customerCode": "398348",
+      "name": "JOSE SILVESTRE GARCIA JAIMES"
+    },
+    {
+      "customerCode": "398376",
+      "name": "IGNACIO CORELLA CASTILLO"
+    },
+    {
+      "customerCode": "398790",
+      "name": "ESPIRIDION HERNANDEZ VILLALOBOS"
+    },
+    {
+      "customerCode": "402532",
+      "name": "OSCAR DE JESUS GOMEZ LORENZO"
+    },
+    {
+      "customerCode": "402533",
+      "name": "ABARROTERA FUENTES OAXTEPEC"
+    },
+    {
+      "customerCode": "402534",
+      "name": "ABARROTERA FUENTES ZACARIAS"
+    },
+    {
+      "customerCode": "402536",
+      "name": "ABARROTERA FUENTES JOJUTLA CENTRO"
+    },
+    {
+      "customerCode": "402538",
+      "name": "ABARROTERA FUENTES GALEANA"
+    },
+    {
+      "customerCode": "402539",
+      "name": "ABARROTERA FUENTES GUALUPITA"
+    },
+    {
+      "customerCode": "402540",
+      "name": "ABARROTERA FUENTES GUALUPITA"
+    },
+    {
+      "customerCode": "402543",
+      "name": "ABARROTERA FUENTES PALMAS"
+    },
+    {
+      "customerCode": "402551",
+      "name": "ABARROTERA FUENTES YAUTEPEC"
+    },
+    {
+      "customerCode": "403045",
+      "name": "ABARROTERA FUENTES PTE IXTLA MERCADO"
+    },
+    {
+      "customerCode": "000299",
+      "name": "GRUPO ABARROTERO REX SA DE CV"
+    },
+    {
+      "customerCode": "100231",
+      "name": "LOREN IVETTE BORJA RODRIGUEZ"
+    },
+    {
+      "customerCode": "000137",
+      "name": "MARIA MARGARITA MUCIÑO CAMACHO"
+    },
+    {
+      "customerCode": "100212",
+      "name": "JOSE BERTIN GUTIERREZ PEREZ"
+    },
+    {
+      "customerCode": "000160",
+      "name": "SUPER MAR GAR"
+    },
+    {
+      "customerCode": "000094",
+      "name": "ABARROTES CASA REZA  SA DE CV"
+    },
+    {
+      "customerCode": "000130",
+      "name": "HERIBERTO VELA ROMAN"
+    },
+    {
+      "customerCode": "100180",
+      "name": "DIANA LEON MALDONADO"
+    },
+    {
+      "customerCode": "100190",
+      "name": "FILIBERTO MEDRANO RIVERA"
+    },
+    {
+      "customerCode": "100222",
+      "name": "OCTAVIANO TRANQUILINO PEREZ"
+    },
+    {
+      "customerCode": "100226",
+      "name": "ANA MARIA MALAGON ITURBE"
+    },
+    {
+      "customerCode": "100227",
+      "name": "ELIZABETH LOPEZ SANTAMARIA"
+    },
+    {
+      "customerCode": "000152",
+      "name": "ROCIO ISABEL BARRETO VALDEPEÑA"
+    },
+    {
+      "customerCode": "000334",
+      "name": "PEDRO VENTURA CASTRO"
+    },
+    {
+      "customerCode": "000318",
+      "name": "MARLEN BUSTOS PINEDA"
+    },
+    {
+      "customerCode": "100197",
+      "name": "GUILLERMO SALGADO CARACHURE"
+    },
+    {
+      "customerCode": "000322",
+      "name": "GOMEZ BODEGUITA SA DE CV"
+    },
+    {
+      "customerCode": "000333",
+      "name": "ROSALINDO CONDA ATUNEZ"
+    },
+    {
+      "customerCode": "100271",
+      "name": "ERIKA CUEVAS ROMAN"
+    },
+    {
+      "customerCode": "000206",
+      "name": "EBELIA GUADARRAMA SALGADO"
+    },
+    {
+      "customerCode": "000126",
+      "name": "REYNEL GONZALEZ CERVANTES"
+    },
+    {
+      "customerCode": "100258",
+      "name": "CARNITAS LA VIA"
+    },
+    {
+      "customerCode": "000156",
+      "name": "SIMON MORALES TECORRAL"
+    },
+    {
+      "customerCode": "000176",
+      "name": "ALEJANDRO MOJICA REYES"
+    },
+    {
+      "customerCode": "100294",
+      "name": "JUAN RENDON MARTINEZ"
+    },
+    {
+      "customerCode": "000325",
+      "name": "NICOLAS MUÑOZ GONZAGA"
+    },
+    {
+      "customerCode": "000276",
+      "name": "AMERICA GUZMAN ECHEVERRIA"
+    },
+    {
+      "customerCode": "100256",
+      "name": "ALTAGRACIA MAXELLI BORJA RODRIGUEZ"
+    },
+    {
+      "customerCode": "000127",
+      "name": "AMALIA GONZALEZ GUZMAN"
+    },
+    {
+      "customerCode": "100257",
+      "name": "JUAN CARLOS MACEDO GARCIA"
+    },
+    {
+      "customerCode": "100233",
+      "name": "LEON ERNESTO FIGUEROA MALAGON"
+    },
+    {
+      "customerCode": "000229",
+      "name": "LOGISTICA COMERCIAL XOCHICALCO"
+    },
+    {
+      "customerCode": "100187",
+      "name": "UBALDA SORIA CASTILLO"
+    },
+    {
+      "customerCode": "100249",
+      "name": "JOSUE ISAAC GOMEZ SALAZAR"
+    },
+    {
+      "customerCode": "000143",
+      "name": "NIETO COMERCIAL Y CIA"
+    },
+    {
+      "customerCode": "100275",
+      "name": "LAYDA ORTEGA SERAFIN"
+    },
+    {
+      "customerCode": "100276",
+      "name": "KARLA VIANEY ORTEGA MARTINEZ"
+    },
+    {
+      "customerCode": "100278",
+      "name": "NOE ARROYO CONCHA"
+    },
+    {
+      "customerCode": "100279",
+      "name": "DULCERIA EL TAPONCITO "
+    },
+    {
+      "customerCode": "100282",
+      "name": "JORGE TRUJILLO VALENZO "
+    },
+    {
+      "customerCode": "100284",
+      "name": "JOSE LUIS GARRIDO BELTRAN "
+    },
+    {
+      "customerCode": "100286",
+      "name": "JOSE ARTURO BARRERA ALVAREZ "
+    },
+    {
+      "customerCode": "100289",
+      "name": "ARACELI LOPEZ RIVERA "
+    },
+    {
+      "customerCode": "100297",
+      "name": "ABASTECEDORA DE DULCES YAMI"
+    },
+    {
+      "customerCode": "100277",
+      "name": "GABRIEL TORRES ESCOBAR"
+    },
+    {
+      "customerCode": "100301",
+      "name": "NANCY CARIME MORALES CANDANEDO"
+    },
+    {
+      "customerCode": "000091",
+      "name": "ABARROTERA FUENTES, S.A. DE C.V."
+    },
+    {
+      "customerCode": "100189",
+      "name": "MIRIAM SALANUEVA GUILLERMO"
+    },
+    {
+      "customerCode": "100251",
+      "name": "AXEL OWEN LEÓN"
+    }
+  ]
+}
